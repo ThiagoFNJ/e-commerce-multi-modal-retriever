@@ -1,7 +1,7 @@
 [project]
-name = "esci-ma"
+name = "e-commerce-multi-modal-retriever"
 version = "0.1.0"
-description = "Multi-aspect retrieval on Amazon ESCI: text, reviews and images as separate vector spaces"
+description = "E-Commerce Multi-Modal Retriever: multi-aspect product retrieval on Amazon ESCI, with text, reviews and images as separate vector spaces"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2",

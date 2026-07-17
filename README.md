@@ -1,7 +1,8 @@
-# Multi-aspect retrieval on Amazon ESCI
+# E-Commerce Multi-Modal Retriever
 
-Product search where specifications, customer reviews and images are **separate vector
-spaces** rather than one pooled embedding — evaluated against real relevance judgments.
+Multi-aspect product search on Amazon ESCI, where specifications, customer reviews and
+images are **separate vector spaces** rather than one pooled embedding — evaluated against
+real relevance judgments.
 
 **Research question:** do reviews carry retrievable signal beyond catalog fields, or does
 the apparent gain dissolve inside the confidence interval above the random floor?
@@ -174,8 +175,9 @@ frozen); this repo consumes it and does not mirror it.
 
 | Notebook | Output |
 |---|---|
-| `notebooks/01_datasets.ipynb` | `task1_us_{products,qrels,reviews}.parquet` |
-| `notebooks/02_images.ipynb` | `images/`, `image_manifest.parquet` |
+| `notebooks/esci_asin_join.ipynb` | `data/processed/task1_us_{products,qrels,reviews}.parquet` |
+| `notebooks/esci_images.ipynb` | `data/images/`, `data/processed/image_manifest.parquet` |
+| `notebooks/esci_s_inspection.ipynb` | data-quality checks behind §1.4 (no artifact) |
 
 ---
 

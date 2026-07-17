@@ -1,16 +1,16 @@
-"""Parsers para os campos de UI raspados do esci-s.
+"""Parsers for the scraped UI fields in esci-s.
 
-O esci-s guarda strings da interface da Amazon como o scraper as encontrou. Elas sao
-localizadas e sujas. Este modulo isola a bagunca:
+esci-s stores Amazon interface strings exactly as the scraper found them. They are
+localised and dirty. This module isolates the mess:
 
     "4.3 out of 5 stars"                              -> 4.3
-    "5つ星のうち4.3"                                    -> 4.3   (nota vem DEPOIS do 5)
-    "1.116 valoraciones"                              -> 1116  ('.' e separador de milhar em es)
+    "5つ星のうち4.3"                                    -> 4.3   (score comes AFTER the 5)
+    "1.116 valoraciones"                              -> 1116  ('.' is the thousands separator in es)
     "Reviewed in the United States 🇺🇸n Sep 22, 2022"  -> ("the United States", date)
-                                     ^ o '\\n' foi comido pelo scraper
+                                     ^ the '\\n' was eaten by the scraper
 
-Todas as funcoes retornam None em vez de levantar. Meça a taxa de parse por locale
-antes de confiar: uma taxa baixa significa formato de UI nao coberto aqui, nao dado ruim.
+Every function returns None instead of raising. Measure the parse rate per locale before
+trusting it: a low rate means a UI format not covered here, not bad data.
 """
 
 from __future__ import annotations
@@ -21,16 +21,15 @@ from datetime import datetime
 __all__ = ["parse_stars", "parse_ratings", "parse_review_date"]
 
 
-# --------------------------------------------------------------------- stars
 _STARS = (
-    re.compile(r"([\d.]+)\s+out of\s+5"),        # us
-    re.compile(r"([\d,]+)\s+de\s+5"),            # es
-    re.compile(r"5\s*つ星のうち\s*([\d.]+)"),      # jp: nota DEPOIS do "5"
+    re.compile(r"([\d.]+)\s+out of\s+5"),
+    re.compile(r"([\d,]+)\s+de\s+5"),
+    re.compile(r"5\s*つ星のうち\s*([\d.]+)"),
 )
 
 
 def parse_stars(s: str | None) -> float | None:
-    """Nota media do produto (0-5)."""
+    """Average product rating (0-5)."""
     if not s:
         return None
     for rx in _STARS:
@@ -43,8 +42,6 @@ def parse_stars(s: str | None) -> float | None:
     return None
 
 
-# ------------------------------------------------------------------- ratings
-# O separador de milhar depende do locale: ',' em us/jp, '.' em es.
 _RATINGS = (
     (re.compile(r"([\d,]+)\s+(?:global\s+)?ratings?"), ","),
     (re.compile(r"([\d,]+)\s+(?:global\s+)?reviews?"), ","),
@@ -56,10 +53,11 @@ _RATINGS = (
 
 
 def parse_ratings(s: str | None) -> int | None:
-    """Numero de avaliacoes. E o sinal de popularidade REAL do produto.
+    """Number of ratings. This is the product's REAL popularity signal.
 
-    Nao confundir com len(reviews): a pagina exibe no maximo ~13 reviews, entao
-    a contagem de reviews raspadas mede o scraper, nao o produto.
+    Do not confuse it with len(reviews): the page renders at most ~13 reviews, so the
+    count of scraped reviews measures the scraper, not the product. The thousands
+    separator is locale-dependent: ',' in us/jp, '.' in es.
     """
     if not s:
         return None
@@ -73,7 +71,6 @@ def parse_ratings(s: str | None) -> int | None:
     return None
 
 
-# ---------------------------------------------------------------------- date
 _MONTHS_ES = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
     "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10,
@@ -82,8 +79,6 @@ _MONTHS_ES = {
 
 _FLAG = r"[\U0001F1E6-\U0001F1FF]{0,2}"
 
-# US: mes-primeiro, com virgula.  UK/AU: dia-primeiro, sem virgula.
-# O 'n?' cobre o '\n' que o scraper comeu e deixou como 'n' orfao.
 _DATE_US = re.compile(
     rf"Reviewed in (?P<country>.+?)\s*{_FLAG}\s*n?\s*"
     r"(?:on\s+)?(?P<mon>[A-Z][a-z]+)\s+(?P<day>\d{1,2}),\s*(?P<year>\d{4})"
@@ -103,16 +98,18 @@ _DATE_JP = re.compile(
 
 
 def parse_review_date(s: str | None) -> tuple[str | None, datetime | None]:
-    """-> (pais de origem, data). (None, None) se nao parsear.
+    """Return (origin country, date), or (None, None) if it does not parse.
 
-    O pais importa: o bloco de reviews de uma pagina 'us' inclui reviews
-    internacionais. E contaminacao de idioma para um encoder monolingue.
+    The country matters: the review block of a 'us' page includes international
+    reviews, which is language contamination for a monolingual encoder. The US
+    (month-first) and UK (day-first) patterns are tried in order because both
+    match "Reviewed in X"; the '\\n' the scraper ate is absorbed by the optional 'n'.
     """
     if not s:
         return None, None
     s = str(s)
 
-    for rx in (_DATE_US, _DATE_UK):  # ordem importa: ambos casam "Reviewed in X"
+    for rx in (_DATE_US, _DATE_UK):
         m = rx.search(s)
         if m:
             try:
