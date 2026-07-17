@@ -1,0 +1,17 @@
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+
+*.parquet
+*.zst
+*.json.gz
+images/
+
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
