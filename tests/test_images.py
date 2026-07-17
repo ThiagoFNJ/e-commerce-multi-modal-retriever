@@ -3,7 +3,7 @@ import io
 import pytest
 from PIL import Image
 
-from esci_ma.data.images import canonical_url, fetch_one, shard_path
+from emmr.data.images import canonical_url, fetch_one, shard_path
 
 
 class _Resp:

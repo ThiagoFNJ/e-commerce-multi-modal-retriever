@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from esci_ma.data.parsers import parse_ratings, parse_review_date, parse_stars
+from emmr.data.parsers import parse_ratings, parse_review_date, parse_stars
 
 US_FLAG, AU_FLAG, ES_FLAG = "\U0001F1FA\U0001F1F8", "\U0001F1E6\U0001F1FA", "\U0001F1EA\U0001F1F8"
 
