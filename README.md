@@ -1,7 +1,8 @@
-# Multi-aspect retrieval on Amazon ESCI
+# E-Commerce Multi-Modal Retriever
 
-Product search where specifications, customer reviews and images are **separate vector
-spaces** rather than one pooled embedding — evaluated against real relevance judgments.
+Multi-aspect product search on Amazon ESCI, where specifications, customer reviews and
+images are **separate vector spaces** rather than one pooled embedding — evaluated against
+real relevance judgments.
 
 **Research question:** do reviews carry retrievable signal beyond catalog fields, or does
 the apparent gain dissolve inside the confidence interval above the random floor?
@@ -85,7 +86,7 @@ https://m.media-amazon.com/images/W/WEBP_402378-T2/images/I/51Al1NB3LnL.__AC_SX3
 Only the image ID is canonical. Rebuilding the URL from it recovers the resource; editing
 the existing URL does not. Download success went **53.5% → 99.6%** after canonicalisation.
 Presents as HTTP 400, which reads like permanent link rot — it is not.
-See `src/esci_ma/data/images.py`.
+See `src/emmr/data/images.py`.
 
 **`len(reviews)` measures the scraper, not the product.**
 Distribution of reviews per product: median 8, **max 13, hard**. The product page renders a
@@ -106,7 +107,7 @@ the marketplace:
 A naive first-float parser returns `5.0` for every Japanese product and `1.116` for Spanish
 rating counts. Also: the scraper ate a `\n`, leaving an orphan `n` mid-string
 (`"Reviewed in the United States 🇺🇸n September 22, 2022"`), and UK/AU reviews use
-day-first dates. Handled in `src/esci_ma/data/parsers.py`, tested against literal
+day-first dates. Handled in `src/emmr/data/parsers.py`, tested against literal
 observed strings.
 
 **Review blocks mix locales.**
@@ -174,8 +175,9 @@ frozen); this repo consumes it and does not mirror it.
 
 | Notebook | Output |
 |---|---|
-| `notebooks/01_datasets.ipynb` | `task1_us_{products,qrels,reviews}.parquet` |
-| `notebooks/02_images.ipynb` | `images/`, `image_manifest.parquet` |
+| `notebooks/esci_asin_join.ipynb` | `data/processed/task1_us_{products,qrels,reviews}.parquet` |
+| `notebooks/esci_images.ipynb` | `data/images/`, `data/processed/image_manifest.parquet` |
+| `notebooks/esci_s_inspection.ipynb` | data-quality checks behind §1.4 (no artifact) |
 
 ---
 
