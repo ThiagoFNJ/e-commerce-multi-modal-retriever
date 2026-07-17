@@ -167,17 +167,27 @@ mapping are not comparable to published numbers computed with the script.
 
 ```bash
 uv sync --extra dev
-pytest                                  # 43 tests, ~0.5s
+pytest                                  # 51 tests, ~0.6s
 ```
+
+The dataset is built by an ordered, resumable pipeline under `scripts/` — not by
+notebooks. Each stage reads its paths from `src/emmr/config.py` and writes into the
+gitignored `data/` tree (`raw` → `interim` → `processed`).
+
+| Stage | Command | Output |
+|---|---|---|
+| 01 | `uv run scripts/01_fetch_sources.py` | `data/raw/esci.json.zst` (~3.4 GB, resumable) |
+| 02 | `uv run scripts/02_parse_esci_s.py` | `data/interim/esci_s_{products,reviews}.parquet` |
+| 03 | `uv run scripts/03_build_datasets.py` | `data/processed/task1_us_{products,qrels,reviews}.parquet` |
+| 04 | `uv run scripts/04_fetch_images.py --workers 8` | `data/images/`, `data/processed/image_manifest.parquet` |
+
+The reusable logic lives in `src/emmr/data/` (`sources`, `esci_s`, `build`, `images`,
+`parsers`); the scripts are thin ordered entry points over it. Notebooks under
+`notebooks/` are for **visual inspection only** — coverage tables, md5 placeholder
+clusters — and produce no artifacts.
 
 Datasets are not redistributed. esci-s is an unofficial scrape of Amazon (Jan 2023,
 frozen); this repo consumes it and does not mirror it.
-
-| Notebook | Output |
-|---|---|
-| `notebooks/esci_asin_join.ipynb` | `data/processed/task1_us_{products,qrels,reviews}.parquet` |
-| `notebooks/esci_images.ipynb` | `data/images/`, `data/processed/image_manifest.parquet` |
-| `notebooks/esci_s_inspection.ipynb` | data-quality checks behind §1.4 (no artifact) |
 
 ---
 

@@ -1,9 +1,16 @@
 import io
 
+import pandas as pd
 import pytest
 from PIL import Image
 
-from emmr.data.images import canonical_url, fetch_one, shard_path
+from emmr.data.images import (
+    canonical_url,
+    fetch_one,
+    mark_placeholders,
+    prepare_urls,
+    shard_path,
+)
 
 
 class _Resp:
@@ -93,3 +100,33 @@ def test_fetch_one_skips_if_exists(jpeg, tmp_path):
     dest.write_bytes(jpeg)
     out = fetch_one("B000TEST03", "http://x/y.jpg", _Session([_Resp(500)]), tmp_path)
     assert out["status"] == "skip"
+
+
+def test_prepare_urls_drops_missing_and_non_product(tmp_path):
+    df = pd.DataFrame({
+        "product_id": ["A", "B", "C", "D"],
+        "image": [
+            "https://m.media-amazon.com/images/I/71a.jpg",
+            "",
+            None,
+            "https://m.media-amazon.com/images/G/01/vid.jpg",
+        ],
+    })
+    out = prepare_urls(df)
+    assert set(out.product_id) == {"A"}
+    assert out.iloc[0].url_small.endswith("/images/I/71a._SL256_.jpg")
+
+
+def test_mark_placeholders_clusters_across_ok_and_skip(tmp_path):
+    manifest = pd.DataFrame({
+        "product_id": ["A", "B", "C", "D", "E"],
+        "status": ["ok", "ok", "ok", "ok", "skip"],
+        "md5": ["shared", "shared", "shared", "unique", "shared"],
+    })
+    out = mark_placeholders(manifest, tmp_path, cluster_max=3).set_index("product_id")
+    assert out.is_placeholder.to_dict() == {
+        "A": True, "B": True, "C": True, "D": False, "E": True,
+    }
+    assert out.usable["D"]
+    assert not out.usable["A"]
+    assert not out.usable["E"]
