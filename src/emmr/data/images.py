@@ -34,7 +34,10 @@ import pandas as pd
 import requests
 from PIL import Image
 
-__all__ = ["canonical_url", "shard_path", "make_session", "fetch_one", "fetch_many"]
+__all__ = [
+    "canonical_url", "shard_path", "make_session", "fetch_one", "fetch_many",
+    "prepare_urls", "build_manifest", "backfill_skip_md5", "mark_placeholders",
+]
 
 DEFAULT_PX = 256
 DEFAULT_WORKERS = 8
@@ -163,3 +166,92 @@ def fetch_many(
             out = f.result()
             rows.append(out if out is not None else _row(futs[f], "none_returned"))
     return pd.DataFrame(rows)
+
+
+def prepare_urls(products: pd.DataFrame, px: int = DEFAULT_PX) -> pd.DataFrame:
+    """From a products frame (`product_id`, `image`) build (`product_id`, `url`, `url_small`).
+
+    Drops rows with no URL and rows whose URL has no `/images/I/` id (canonical_url
+    returns None), which also strips the video placeholder for free.
+    """
+    urls = (
+        products[["product_id", "image"]]
+        .rename(columns={"image": "url"})
+        .dropna(subset=["url"])
+    )
+    urls = urls[urls.url.str.strip().str.len() > 0].copy()
+    urls["url_small"] = urls.url.map(lambda u: canonical_url(u, px))
+    return urls.dropna(subset=["url_small"]).reset_index(drop=True)
+
+
+def build_manifest(
+    urls: pd.DataFrame,
+    root: Path,
+    manifest_path: Path,
+    workers: int = DEFAULT_WORKERS,
+    chunk: int = 20_000,
+) -> pd.DataFrame:
+    """Resumable download over `urls` (needs `product_id`, `url_small`).
+
+    The manifest is rewritten after every chunk; a rerun reads it back and skips
+    every product_id already `ok`/`skip`, so an interrupted run continues where it
+    stopped. Returns the full manifest.
+    """
+    manifest_path = Path(manifest_path)
+    parts: list[pd.DataFrame] = []
+    pending = urls
+    if manifest_path.exists():
+        prev = pd.read_parquet(manifest_path)
+        done = set(prev.query("status in ['ok', 'skip']").product_id)
+        pending = urls[~urls.product_id.isin(done)]
+        parts.append(prev)
+
+    for i in range(0, len(pending), chunk):
+        part = fetch_many(pending.iloc[i:i + chunk], root, workers=workers)
+        parts.append(part)
+        (
+            pd.concat(parts, ignore_index=True)
+            .drop_duplicates("product_id", keep="last")
+            .to_parquet(manifest_path, compression="zstd")
+        )
+    return pd.read_parquet(manifest_path)
+
+
+def backfill_skip_md5(manifest: pd.DataFrame, root: Path) -> pd.DataFrame:
+    """Fill `md5` for `skip` rows by hashing the file already on disk.
+
+    `skip` rows enter the manifest without a hash (the download was short-circuited),
+    so without this they are invisible to placeholder clustering.
+    """
+    manifest = manifest.copy()
+    mask = (manifest.status == "skip") & (manifest.md5.isna())
+    hashes = {}
+    for pid in manifest.loc[mask, "product_id"]:
+        p = shard_path(pid, root)
+        if p.exists():
+            hashes[pid] = hashlib.md5(p.read_bytes()).hexdigest()
+    manifest.loc[mask, "md5"] = manifest.loc[mask, "product_id"].map(hashes)
+    return manifest
+
+
+def mark_placeholders(
+    manifest: pd.DataFrame,
+    root: Path,
+    cluster_max: int = 10,
+) -> pd.DataFrame:
+    """Flag placeholders by md5 clustering and compute the `usable` column.
+
+    An image byte-identical across more than `cluster_max` ASINs cannot discriminate
+    between them (`No image available`, generic backgrounds), so it is a placeholder.
+    Smaller clusters (2-5) are kept: those are parent/child variants sharing one photo,
+    which is real catalog structure. Run `backfill_skip_md5` first so `skip` rows count.
+    """
+    manifest = manifest.copy()
+    with_md5 = manifest[manifest.md5.notna()]
+    cluster = with_md5.md5.value_counts()
+
+    manifest["cluster_size"] = manifest.md5.map(cluster).fillna(0).astype(int)
+    manifest["is_placeholder"] = manifest.cluster_size > cluster_max
+    manifest["path"] = manifest.product_id.map(lambda p: str(shard_path(p, root)))
+    manifest["usable"] = manifest.status.isin(["ok", "skip"]) & ~manifest.is_placeholder
+    return manifest
