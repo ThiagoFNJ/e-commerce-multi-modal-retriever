@@ -1,19 +1,23 @@
-"""Aquisicao das imagens de produto a partir das URLs do esci-s.
+"""Acquisition of product images from the esci-s URLs.
 
-O esci-s guarda a URL como a pagina a servia em jan/2023. Essa URL carrega
-*transporte* junto com o conteudo, e o transporte apodreceu:
+esci-s stores the URL as the page served it in Jan 2023. That URL carries *transport*
+alongside the content, and the transport has rotted:
 
     https://m.media-amazon.com/images/W/WEBP_402378-T2/images/I/51Al1NB3LnL.__AC_SX300_SY300_QL70_FMwebp_.jpg
                               ^^^^^^^^^^^^^^^^^^^^^^^^                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                              wrapper WebP, token de deploy                   diretivas de render
-                              -> HTTP 400 hoje
+                              WebP wrapper, deploy token                     render directives
+                              -> HTTP 400 today
 
-So o ID da imagem (`51Al1NB3LnL`) e canonico. Reconstruir a URL a partir dele
-recupera o recurso; editar a URL existente nao. Medido: 46% das URLs de uma amostra
-aleatoria carregam o wrapper e devolvem 400; apos canonicalizacao, 99.6% baixam.
+Only the image ID (`51Al1NB3LnL`) is canonical. Rebuilding the URL from it recovers the
+resource; editing the existing URL does not. Measured: 46% of the URLs in a random sample
+carry the wrapper and return 400; after canonicalisation, 99.6% download.
 
-A diretiva `_SL256_` pede a versao redimensionada ao CDN: ~8 KB em vez de ~200 KB.
-Em 357k imagens, ~3 GB em vez de ~80 GB.
+The `_SL256_` directive requests the resized 256 px version from the CDN (margin over the
+224 that SigLIP/CLIP need): ~8 KB instead of ~200 KB. Across 357k images, ~3 GB instead
+of ~80 GB.
+
+Defaults are measured, not guessed: 8 workers is the throughput knee -- 24 triggers
+throttling and drops throughput from 62 to 27 it/s.
 """
 
 from __future__ import annotations
@@ -32,8 +36,8 @@ from PIL import Image
 
 __all__ = ["canonical_url", "shard_path", "make_session", "fetch_one", "fetch_many"]
 
-DEFAULT_PX = 256  # SigLIP-224 / CLIP-224 precisam de 224; 256 da margem para o resize
-DEFAULT_WORKERS = 8  # 24 causa throttle: vazao caiu de 62 para 27 it/s
+DEFAULT_PX = 256
+DEFAULT_WORKERS = 8
 DEFAULT_TIMEOUT = 20
 DEFAULT_RETRY = 5
 
@@ -47,13 +51,12 @@ def _row(product_id: str, status: str, **kw) -> dict:
     return {"product_id": product_id, "status": status, **_EMPTY, **kw}
 
 
-# ----------------------------------------------------------------------- url
 def canonical_url(url: str | None, px: int = DEFAULT_PX) -> str | None:
-    """Reconstroi a URL a partir do ID da imagem.
+    """Rebuild the URL from the image ID.
 
-    Retorna None se a URL nao apontar para uma imagem de produto -- o que
-    tambem descarta de graca o placeholder de video (`/images/G/...`), que
-    nao tem `/images/I/`.
+    Returns None if the URL does not point to a product image -- which also
+    discards the video placeholder (`/images/G/...`) for free, since it has no
+    `/images/I/` segment.
     """
     if not url:
         return None
@@ -64,11 +67,10 @@ def canonical_url(url: str | None, px: int = DEFAULT_PX) -> str | None:
 
 
 def shard_path(product_id: str, root: Path) -> Path:
-    """Espalha em 2 niveis. 357k arquivos num diretorio so degrada o filesystem."""
+    """Shard across 2 levels. 357k files in a single directory degrades the filesystem."""
     return root / product_id[:2] / product_id[2:4] / f"{product_id}.jpg"
 
 
-# ------------------------------------------------------------------- fetch
 def make_session(workers: int = DEFAULT_WORKERS) -> requests.Session:
     s = requests.Session()
     s.headers.update({
@@ -92,7 +94,7 @@ def fetch_one(
     timeout: int = DEFAULT_TIMEOUT,
     max_retry: int = DEFAULT_RETRY,
 ) -> dict:
-    """Baixa uma imagem. Sempre retorna um dict -- nunca None, nunca levanta.
+    """Download one image. Always returns a dict -- never None, never raises.
 
     status: ok | skip | http_error | not_image | retry_exhausted | exception
     """
@@ -114,7 +116,7 @@ def fetch_one(
                 time.sleep(min(wait, 30))
                 continue
 
-            if not r.ok:  # 400 (wrapper morto), 404 (link rot), 403...
+            if not r.ok:
                 return _row(product_id, "http_error", http=r.status_code)
 
             content = r.content
@@ -144,7 +146,7 @@ def fetch_many(
     workers: int = DEFAULT_WORKERS,
     progress: bool = True,
 ) -> pd.DataFrame:
-    """df precisa de colunas `product_id` e `url_small`."""
+    """df needs `product_id` and `url_small` columns."""
     sessions = [make_session(workers) for _ in range(workers)]
     rows = []
     with ThreadPoolExecutor(max_workers=workers) as ex:

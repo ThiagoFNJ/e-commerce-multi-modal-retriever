@@ -1,17 +1,27 @@
+# --- Data (never redistributed; see CONTEXT.md §9) ---
 data/raw/*
 data/interim/*
 data/processed/*
+data/images/
 !data/**/.gitkeep
 
+# Data blob formats, wherever they land
 *.parquet
 *.zst
 *.json.gz
-images/
 
+# --- Python ---
 __pycache__/
 *.py[cod]
 .venv/
-.ipynb_checkpoints/
 .pytest_cache/
 .ruff_cache/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- OS ---
 .DS_Store
+
+# --- Local handoff notes (not versioned) ---
+CONTEXT.md
