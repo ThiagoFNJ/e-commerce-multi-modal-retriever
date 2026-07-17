@@ -9,4 +9,4 @@ def _no_sleep(monkeypatch):
     2**attempt + jitter, which sums to ~15s per exhaustion test.
     The backoff itself is covered by call count, not by the clock.
     """
-    monkeypatch.setattr("esci_ma.data.images.time.sleep", lambda _: None)
+    monkeypatch.setattr("emmr.data.images.time.sleep", lambda _: None)
