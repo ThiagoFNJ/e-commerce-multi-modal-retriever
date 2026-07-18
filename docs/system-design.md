@@ -74,8 +74,9 @@ single **global** bucket.
    name them into a canonical set of **polarity-neutral facet phrases** — "arch support",
    "waterproofing", "sizing accuracy". Each facet carries a **category-level salience** = its
    matching-review count in the bucket (a real count now, since the bucket is data-rich).
-   Mechanism: LLM aspect extraction + embedding clustering/naming (distant-supervised, no
-   labels). Runs **once per bucket** (a few thousand buckets), not per product.
+   Mechanism: LLM aspect extraction (**Claude Sonnet 5**) + embedding clustering/naming
+   (distant-supervised, no labels). Runs **once per bucket** (a few thousand buckets), not
+   per product.
 3. **Match (per product).** Match the bucket vocabulary against the product's ≤13 reviews by
    cosine in the **shared dense encoder** space (§3); keep the **top-K** facets the product
    actually expresses, ranked by product-level support → a K×d matrix, upsert as the review
@@ -134,7 +135,7 @@ granularity at a 1k floor; two-level count salience; intrinsic canonicalization)
 
 | Channel | Representation | Encoder | Role |
 |---|---|---|---|
-| product **dense** | single vector over title+bullets+description | shared dense bi-encoder | Stage-1 semantic recall |
+| product **dense** | single vector over title+bullets+description | **BGE-small-en-v1.5** (384-d) | Stage-1 semantic recall |
 | product **lexical** | BM25 sparse | — | Stage-1 exact-term recall |
 | **review** | multivector, row per aspect (`MAX_SIM`) | **same** shared dense encoder | Stage-2 |
 | **image** | single vector | SigLIP (query = text tower → joint space) | Stage-2 |
@@ -158,9 +159,11 @@ granularity at a 1k floor; two-level count salience; intrinsic canonicalization)
 - **Image is a separate space.** SigLIP is multimodal; the query is embedded by its text
   tower into the joint image-text space.
 
-**Open:** the specific dense model (BGE / E5 / GTE-small).
+**Encoder:** `BAAI/bge-small-en-v1.5` — 384-d, ~33M params, CPU-friendly at 447k products,
+a strong MTEB retrieval baseline, and the encoder the reference used for reviews. Uses the
+`query:` / `passage:` prompt convention. Shared across the product-dense and review channels.
 
-**Status: DECIDED (architecture) · OPEN (dense model).**
+**Status: DECIDED.**
 
 ---
 
