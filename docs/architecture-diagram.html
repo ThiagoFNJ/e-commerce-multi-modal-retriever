@@ -1,0 +1,385 @@
+<title>Retrieval Architecture — E-Commerce Multi-Modal Retriever</title>
+<style>
+  :root {
+    --font-sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --ground: #f4f7f7;
+    --panel: #ffffff;
+    --panel-2: #eaf0f0;
+    --ink: #16242a;
+    --muted: #5d6d73;
+    --faint: #84969c;
+    --line: #d2dedf;
+    --line-strong: #b7c7c8;
+    --accent: #0d7d7d;
+    --accent-ink: #075a5a;
+    --accent-soft: #dbecec;
+
+    --c-dense:   #3d6ea6;
+    --c-lexical: #a9722a;
+    --c-review:  #7a5aa6;
+    --c-image:   #b1526a;
+    --c-colbert: #3f8579;
+
+    --shadow: 0 1px 2px rgba(20,40,45,.06), 0 8px 24px rgba(20,40,45,.05);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0d1416;
+      --panel: #141e21;
+      --panel-2: #1a262a;
+      --ink: #e7eff0;
+      --muted: #96a6ab;
+      --faint: #6b7d82;
+      --line: #263539;
+      --line-strong: #34474c;
+      --accent: #3fb8b1;
+      --accent-ink: #6fd3cc;
+      --accent-soft: #143034;
+      --c-dense:   #6b9bd1;
+      --c-lexical: #d29b52;
+      --c-review:  #a888d3;
+      --c-image:   #dd7f94;
+      --c-colbert: #63b3a4;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #f4f7f7; --panel: #ffffff; --panel-2: #eaf0f0; --ink: #16242a;
+    --muted: #5d6d73; --faint: #84969c; --line: #d2dedf; --line-strong: #b7c7c8;
+    --accent: #0d7d7d; --accent-ink: #075a5a; --accent-soft: #dbecec;
+    --c-dense:#3d6ea6; --c-lexical:#a9722a; --c-review:#7a5aa6; --c-image:#b1526a; --c-colbert:#3f8579;
+    --shadow: 0 1px 2px rgba(20,40,45,.06), 0 8px 24px rgba(20,40,45,.05);
+  }
+  :root[data-theme="dark"] {
+    --ground: #0d1416; --panel: #141e21; --panel-2: #1a262a; --ink: #e7eff0;
+    --muted: #96a6ab; --faint: #6b7d82; --line: #263539; --line-strong: #34474c;
+    --accent: #3fb8b1; --accent-ink: #6fd3cc; --accent-soft: #143034;
+    --c-dense:#6b9bd1; --c-lexical:#d29b52; --c-review:#a888d3; --c-image:#dd7f94; --c-colbert:#63b3a4;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 3vw, 32px) 56px; }
+
+  /* ---------- header ---------- */
+  header { margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: .72rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(1.5rem, 3.4vw, 2.05rem); font-weight: 650; letter-spacing: -.02em;
+    line-height: 1.12; margin: 0 0 10px; text-wrap: balance;
+  }
+  .sub { color: var(--muted); font-size: 1rem; max-width: 60ch; margin: 0; }
+
+  /* ---------- flow scaffold ---------- */
+  .flow { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+  .connector {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 9px 0; color: var(--accent);
+  }
+  .connector .arw { width: 2px; height: 15px; background: currentColor; position: relative; opacity: .8; }
+  .connector .arw::after {
+    content: ""; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+  }
+  .connector .lbl {
+    font-family: var(--font-mono); font-size: .68rem; letter-spacing: .04em;
+    color: var(--muted); text-transform: uppercase;
+  }
+
+  /* ---------- band (a stage / the query) ---------- */
+  .band {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .band-head {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px;
+    padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+  }
+  .band-num {
+    font-family: var(--font-mono); font-size: .74rem; font-weight: 600;
+    color: var(--accent-ink); letter-spacing: .1em;
+    border: 1px solid var(--line-strong); border-radius: 5px; padding: 2px 7px; background: var(--panel);
+  }
+  .band-title { font-weight: 620; font-size: 1.02rem; letter-spacing: -.01em; }
+  .band-role { color: var(--muted); font-size: .9rem; }
+  .band-head .spacer { flex: 1 1 auto; }
+  .pill {
+    font-family: var(--font-mono); font-size: .72rem; letter-spacing: .03em;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+    background: var(--accent-soft); color: var(--accent-ink); border: 1px solid transparent;
+  }
+  .band-body { padding: 16px 18px; }
+
+  /* ---------- channel cards ---------- */
+  .channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .card {
+    position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 13px 12px 16px; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--stripe, var(--accent));
+  }
+  .card.opt { border-style: dashed; border-color: var(--line-strong); background: transparent; }
+  .card-name {
+    font-family: var(--font-mono); font-weight: 600; font-size: .82rem; letter-spacing: .02em;
+    display: flex; align-items: center; gap: 7px; margin-bottom: 3px;
+  }
+  .card-rep { color: var(--muted); font-size: .82rem; margin-bottom: 9px; }
+  .card-rep code { font-family: var(--font-mono); font-size: .78rem; color: var(--ink); }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-family: var(--font-mono); font-size: .68rem; letter-spacing: .02em;
+    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line);
+    color: var(--muted); background: var(--panel-2); white-space: nowrap;
+  }
+  .tag.q { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  .tag.warn { color: var(--c-image); border-color: color-mix(in srgb, var(--c-image) 40%, var(--line)); }
+  .badge-opt {
+    font-family: var(--font-mono); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: auto;
+  }
+
+  /* ---------- fusion node ---------- */
+  .fuse {
+    display: flex; align-items: center; gap: 12px; margin-top: 14px;
+    padding: 11px 14px; border-radius: 8px;
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  }
+  .fuse .glyph {
+    font-family: var(--font-mono); font-weight: 700; font-size: .9rem; color: var(--accent-ink);
+    letter-spacing: .04em; flex: 0 0 auto;
+  }
+  .fuse .txt { font-size: .86rem; color: var(--ink); }
+  .fuse .txt b { color: var(--accent-ink); font-weight: 650; }
+
+  /* ---------- query encodings ---------- */
+  .enc { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 12px; }
+  .enc .card-name .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stripe); flex: 0 0 auto; }
+
+  /* ---------- result chip ---------- */
+  .result {
+    align-self: center; display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: .84rem; font-weight: 600;
+    padding: 10px 18px; border-radius: 999px; color: #fff; background: var(--accent);
+    box-shadow: var(--shadow); letter-spacing: .01em;
+  }
+  .result { color: #fff; }
+  @media (prefers-color-scheme: dark) { .result { color: #06201f; } }
+  :root[data-theme="light"] .result { color: #fff; }
+  :root[data-theme="dark"] .result { color: #06201f; }
+
+  /* ---------- lower grid ---------- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 16px 18px;
+  }
+  .panel h2 {
+    font-family: var(--font-mono); font-size: .74rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0 0 13px; font-weight: 600;
+  }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: .86rem; }
+  .kv dt { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  .kv dd { margin: 0; }
+  .kv code { font-family: var(--font-mono); font-size: .78rem; }
+  .vecrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .vec {
+    font-family: var(--font-mono); font-size: .72rem; padding: 3px 8px; border-radius: 5px;
+    border: 1px solid var(--line); position: relative; padding-left: 15px;
+  }
+  .vec::before { content:""; position:absolute; left:6px; top:50%; transform:translateY(-50%); width:5px; height:5px; border-radius:50%; background: var(--stripe, var(--muted)); }
+  .vec.opt { border-style: dashed; color: var(--muted); }
+
+  .rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .rules li { display: grid; grid-template-columns: 16px 1fr; gap: 10px; font-size: .88rem; }
+  .rules .mk { color: var(--accent); font-family: var(--font-mono); font-weight: 700; line-height: 1.5; }
+  .rules .mk.def { color: var(--faint); }
+  .rules b { font-weight: 620; }
+  .rules .df { color: var(--muted); }
+
+  /* ---------- legend + footer ---------- */
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .legend span { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  footer { margin-top: 22px; color: var(--faint); font-size: .78rem; font-family: var(--font-mono); letter-spacing: .02em; }
+
+  .reveal { opacity: 0; transform: translateY(8px); animation: rise .5s ease forwards; }
+  .flow > *:nth-child(1) { animation-delay: .02s; }
+  .flow > *:nth-child(3) { animation-delay: .09s; }
+  .flow > *:nth-child(5) { animation-delay: .16s; }
+  .flow > *:nth-child(7) { animation-delay: .23s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">System Design · Retrieval Path</p>
+    <h1>E-Commerce Multi-Modal Retriever</h1>
+    <p class="sub">One query, embedded per representation and fused — no routing. Two stages with
+      separate roles and metrics. Fusion is Reciprocal Rank Fusion: rank-based, label-free, identical in production.</p>
+  </header>
+
+  <div class="flow">
+
+    <!-- QUERY -->
+    <section class="band reveal">
+      <div class="band-head">
+        <span class="band-num">QUERY</span>
+        <span class="band-title">No routing</span>
+        <span class="band-role">full query → every channel · the encoders' own scores decide relevance</span>
+      </div>
+      <div class="band-body">
+        <div class="enc">
+          <div class="card" style="--stripe:var(--c-dense)">
+            <div class="card-name"><span class="dot"></span>dense</div>
+            <div class="card-rep">shared bi-encoder → <code>[1×d]</code></div>
+            <div class="tags"><span class="tag">feeds: product-text</span><span class="tag">+ review · reused</span></div>
+          </div>
+          <div class="card" style="--stripe:var(--c-lexical)">
+            <div class="card-name"><span class="dot"></span>sparse</div>
+            <div class="card-rep">BM25 → sparse terms</div>
+            <div class="tags"><span class="tag">feeds: product-lexical</span></div>
+          </div>
+          <div class="card" style="--stripe:var(--c-image)">
+            <div class="card-name"><span class="dot"></span>siglip-text</div>
+            <div class="card-rep">SigLIP text tower → joint space</div>
+            <div class="tags"><span class="tag">feeds: image · cross-modal</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><span class="lbl">embed once</span><span class="arw"></span></div>
+
+    <!-- STAGE 1 -->
+    <section class="band reveal">
+      <div class="band-head">
+        <span class="band-num">STAGE 1</span>
+        <span class="band-title">Retrieve</span>
+        <span class="band-role">full corpus · ~447k products · HNSW</span>
+        <span class="spacer"></span>
+        <span class="pill">Recall@k — lower bound</span>
+      </div>
+      <div class="band-body">
+        <div class="channels">
+          <div class="card" style="--stripe:var(--c-dense)">
+            <div class="card-name">product · dense</div>
+            <div class="card-rep">single vector over title+bullets+description</div>
+            <div class="tags"><span class="tag q">◂ dense</span><span class="tag">HNSW</span><span class="tag">int8</span><span class="tag">on-disk</span></div>
+          </div>
+          <div class="card" style="--stripe:var(--c-lexical)">
+            <div class="card-name">product · lexical</div>
+            <div class="card-rep">BM25 <code>sparse</code> — exact terms: sizes, models, brands</div>
+            <div class="tags"><span class="tag q">◂ sparse</span><span class="tag">indexed</span></div>
+          </div>
+        </div>
+        <div class="fuse">
+          <span class="glyph">Σ 1/(k+rank)</span>
+          <span class="txt"><b>RRF</b> — rank-based, scale-free, no labels → top-N candidates</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><span class="lbl">top-N candidates</span><span class="arw"></span></div>
+
+    <!-- STAGE 2 -->
+    <section class="band reveal">
+      <div class="band-head">
+        <span class="band-num">STAGE 2</span>
+        <span class="band-title">Rerank</span>
+        <span class="band-role">official candidates · ≤40 per query · brute-force</span>
+        <span class="spacer"></span>
+        <span class="pill">NDCG — vs SQID / CHARM</span>
+      </div>
+      <div class="band-body">
+        <div class="channels">
+          <div class="card" style="--stripe:var(--c-review)">
+            <div class="card-name">review</div>
+            <div class="card-rep">multivector · row per aspect · <code>MAX_SIM</code></div>
+            <div class="tags"><span class="tag q">◂ dense · reused</span><span class="tag">shared encoder</span><span class="tag">top-K</span></div>
+          </div>
+          <div class="card" style="--stripe:var(--c-image)">
+            <div class="card-name">image</div>
+            <div class="card-rep">single vector · SigLIP</div>
+            <div class="tags"><span class="tag q">◂ siglip-text</span><span class="tag warn">26% absent → omit</span></div>
+          </div>
+          <div class="card opt" style="--stripe:var(--c-colbert)">
+            <div class="card-name">product · ColBERT<span class="badge-opt">optional</span></div>
+            <div class="card-rep">token multivector · <code>hnsw_m=0</code> · rerank only</div>
+            <div class="tags"><span class="tag">bounded memory</span><span class="tag">late interaction</span></div>
+          </div>
+        </div>
+        <div class="fuse">
+          <span class="glyph">Σ 1/(k+rank)</span>
+          <span class="txt"><b>RRF</b> — normalized by channels <i>present</i> (missing ≠ score 0)</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><span class="arw"></span></div>
+
+    <div class="result reveal">▚ ranked products</div>
+  </div>
+
+  <!-- LOWER GRID -->
+  <div class="grid2">
+    <div class="panel">
+      <h2>Qdrant point — one per product</h2>
+      <dl class="kv">
+        <dt>id</dt><dd><code>uuid5(asin)</code> · <span class="df">asin in payload</span></dd>
+        <dt>named<br>vectors</dt>
+        <dd>
+          <div class="vecrow">
+            <span class="vec" style="--stripe:var(--c-dense)">dense</span>
+            <span class="vec" style="--stripe:var(--c-lexical)">bm25 · sparse</span>
+            <span class="vec" style="--stripe:var(--c-review)">review · MAX_SIM</span>
+            <span class="vec" style="--stripe:var(--c-image)">image</span>
+            <span class="vec opt" style="--stripe:var(--c-colbert)">colbert · m=0</span>
+          </div>
+        </dd>
+        <dt>payload<br>(indexed)</dt>
+        <dd><code>category · price · brand · color · locale · n_ratings</code></dd>
+        <dt>pre-filter</dt><dd>user facets only — <span class="df">never derived from query text</span></dd>
+      </dl>
+    </div>
+
+    <div class="panel">
+      <h2>Rules &amp; departures</h2>
+      <ul class="rules">
+        <li><span class="mk">→</span><span><b>Shared dense encoder</b> for product-text &amp; reviews — commensurable scores; isolates review <i>content</i> from the encoder as a confound.</span></li>
+        <li><span class="mk">→</span><span><b>Lexical stays lexical</b> — BM25 sparse for exact terms, not a second dense encoder.</span></li>
+        <li><span class="mk">→</span><span><b>RRF over summed scores</b> — the reference summed incommensurable channel scores; RRF needs no calibration and no labels.</span></li>
+        <li><span class="mk def">◦</span><span class="df"><b>Deferred:</b> learned fusion (needs relevance labels → benchmark-bound); review aspect knobs — K, θ, polarity.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="legend" aria-label="channel colors">
+    <span><i style="background:var(--c-dense)"></i>dense</span>
+    <span><i style="background:var(--c-lexical)"></i>lexical</span>
+    <span><i style="background:var(--c-review)"></i>review</span>
+    <span><i style="background:var(--c-image)"></i>image</span>
+    <span><i style="background:var(--c-colbert)"></i>colbert · optional</span>
+  </div>
+
+  <footer>Architecture as agreed in design discussion — fusion = RRF core, learned fusion deferred.</footer>
+</div>
