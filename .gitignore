@@ -25,3 +25,5 @@ __pycache__/
 
 # --- Local handoff notes (not versioned) ---
 CONTEXT.md
+docs/reference-article-teardown.md
+docs/review-mining-research.md
