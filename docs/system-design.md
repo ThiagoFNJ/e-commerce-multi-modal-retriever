@@ -56,6 +56,10 @@ canonical "many reviews → bounded salient set" operation (IBM Project Debater;
 al.), and underlies commercial "customers say" features. This design adopts KPA's *concept*
 but not its original supervised key-point-matching model.
 
+The extraction stage's internals — the local-LLM engine, prompt design, resilience, gold-set
+quality measurement, and GEPA-style prompt optimization — are specified in
+`docs/review-aspect-extraction.md`; this section owns the pipeline shape.
+
 Each product has at most ~13 scraped reviews — too few to mine a stable vocabulary or a
 meaningful salience count per product. So aspects are mined at the **category level** and
 matched down to products (collective KPA).
@@ -70,22 +74,49 @@ single **global** bucket.
 
 **Pipeline (offline, at ingestion).**
 1. **Assign.** Route each product to its adaptive-backoff bucket (or the global bucket).
-2. **Mine (per bucket).** From the bucket's ≥1k reviews, extract candidate aspects, dedup, and
-   name them into a canonical set of **polarity-neutral facet phrases** — "arch support",
-   "waterproofing", "sizing accuracy". Each facet carries a **category-level salience** = its
-   matching-review count in the bucket (a real count now, since the bucket is data-rich).
-   Mechanism: LLM aspect extraction (**Claude Sonnet 5**) + embedding clustering/naming
-   (distant-supervised, no labels). Runs **once per bucket** (a few thousand buckets), not
-   per product.
-3. **Match (per product).** Match the bucket vocabulary against the product's ≤13 reviews by
+2. **Extract (per review, all reviews).** Every review is passed once through **Qwen3-8B run
+   locally via Ollama** (grammar-constrained JSON structured output — guaranteed schema-valid,
+   free, and offline; the trade against a paid API is wall-clock, not dollars). It emits
+   **polarity-neutral facet phrases** — "arch support", "waterproofing", "sizing accuracy" —
+   with the reviewer's sentiment recorded separately as polarity metadata. The prompt is
+   few-shot (negation, trivial-review→empty, opinion→dimension abstraction, non-English→
+   English facets) with explicit facet-style constraints (1–4-word lowercase noun phrase, ≤6
+   per review). **Scope: product-intrinsic aspects only** — delivery, seller, packaging
+   condition, and purchase experience are excluded by instruction. Each facet carries a short
+   verbatim **evidence** quote for grounding and audit; evidence is internal-only and dropped
+   from released artifacts (it is review text, which is not redistributed). Cached by review
+   content hash; results stream to an append-only JSONL checkpoint, so runs are crash-safe
+   and resumable.
+3. **Mine (per bucket).** Aggregate the per-review facets of a bucket's reviews: embed, cluster
+   (dedup at θ), and name into a canonical facet vocabulary. Each facet's **category-level
+   salience** = its matching-review count in the bucket (a real count, since the bucket is
+   data-rich).
+4. **Match (per product).** Match the bucket vocabulary against the product's ≤13 reviews by
    cosine in the **shared dense encoder** space (§3); keep the **top-K** facets the product
    actually expresses, ranked by product-level support → a K×d matrix, upsert as the review
    multivector.
 
 Facets are embedded verbatim by the shared dense encoder — not representative sentences, not
-signed opinions. Vocabularies and extractions are cached per bucket. A
-**whole-review-as-one-vector** variant is retained as a control, to confirm the aspect
-pipeline earns its cost over the reference implementation's fallback.
+signed opinions. Per-review extractions are cached by content hash and bucket vocabularies by
+bucket. A **whole-review-as-one-vector** variant is retained as a control, to confirm the
+aspect pipeline earns its cost over the reference implementation's fallback.
+
+**Artifact.** The extraction produces two tables: `review_aspects.parquet` (review grain —
+the released annotation: `asin, review_no, facet, polarity`, with reviews that yielded no
+aspects kept as null-facet rows so coverage is explicit) and `product_aspects.parquet`
+(product grain, derived by the mine/match steps — what the index consumes). Together they form
+a **polarity-neutral aspect-annotation layer over the ESCI `us` subset**, a contribution in
+its own right: derived facets, not the scraped review text, are stored, so the layer is
+releasable unlike the raw esci-s data (§9); the `evidence` column is stripped from releases.
+The extractor (Qwen3-8B, open weights), prompt, and schema are recorded, so the annotation is
+reproducible. A datasheet accompanies the release.
+
+**Extraction QA.** Quality is measured, not assumed: a ~150–200-review **gold set**
+(stratified over trivial, long, foreign-language, and low-star reviews; hand-verified)
+scores facet precision/recall — with semantic matching in the shared encoder space — and
+polarity accuracy. Corpus-wide, polarity is cross-checked against `rev_stars` (a labeled-free
+sanity signal). Model and prompt changes are A/B'd against the gold set; the pilot also
+measures real throughput before the full pass is scoped.
 
 **Polarity is extracted but quarantined.** The LLM also emits a polarity per facet, stored as
 **per-aspect metadata** — never in the embedded string and never in the score. Two reasons.

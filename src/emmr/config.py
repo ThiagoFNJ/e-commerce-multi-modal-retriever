@@ -41,6 +41,22 @@ GAIN = {"E": 1.0, "S": 0.1, "C": 0.01, "I": 0.0}
 
 CLUSTER_MAX = 10
 
+# --- Review-aspect pipeline (KPA) ---
+DENSE_ENCODER = "BAAI/bge-small-en-v1.5"        # shared dense encoder (retrieval + KPA)
+EXTRACTION_MODEL = "qwen3:8b"                    # per-review aspect extraction, local via Ollama
+
+BACKOFF_FLOOR = 1_000                           # min reviews for a category bucket to be mined
+ASPECT_TOP_K = 8                                # facets kept per product (tunable)
+ASPECT_DEDUP_THRESHOLD = 0.85                   # cosine threshold for vocabulary dedup (tunable, theta)
+# Aspects are extracted from every review exactly once (no sampling), by a local Qwen3-8B
+# (Ollama, grammar-constrained JSON), cached by review content hash; bucket vocabularies
+# aggregate the per-review aspects.
+
+GOLD_DIR = INTERIM / "gold"                                   # annotation sheet, manifest, frozen gold splits
+REVIEW_ASPECTS_CHECKPOINT = INTERIM / "review_aspects.jsonl"  # append-only, crash-safe, resumable
+REVIEW_ASPECTS = PROCESSED / "review_aspects.parquet"        # released annotation (review grain)
+PRODUCT_ASPECTS = PROCESSED / "product_aspects.parquet"      # derived, index-facing (product grain)
+
 
 def ensure_dirs() -> None:
     """Create the data tree if missing. Safe to call repeatedly."""

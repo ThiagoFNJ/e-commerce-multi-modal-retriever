@@ -115,3 +115,17 @@ cells cost essentially the same as one. Encoders are never re-run per cell.
 - k values for Recall (100 / 1000) and whether to score `E` only vs `E∪S`.
 - Whether to include an `E∪S` "graded recall" variant in Grid R.
 - Bootstrap B and the correction method (BH vs Holm) — fixed before running, not after.
+
+## 7. Future work — incremental data-scaling
+
+A third experiment, deferred (added complexity not worth buying yet): measure how the metrics
+move as data is added incrementally, simulating production ingestion / degradation.
+
+- **Product-coverage sweep** (25 / 50 / 75 / 100% of the corpus) → Stage-1 Recall@k as the
+  haystack grows.
+- **Reviews-per-product sweep** (0 / 1 / 3 / 7 / 13) → Stage-2 NDCG of the review channel as
+  review volume grows — probes whether the review signal needs volume to pay off, and the
+  ≤13-review sparsity ceiling directly. Also bounds extraction cost: the cheap arms run first,
+  and only justify the full pass if the curve is still climbing at 13.
+- Optional realism variant: a **temporal split** on review dates (older reviews = initial
+  index, newer = incremental additions) instead of random coverage.
