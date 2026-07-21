@@ -1,0 +1,95 @@
+parent: v4
+created: '2026-07-21'
+status: candidate
+notes: 'Reflection on v4 (F1 0.4783, P 0.411 / R 0.572): (1) BUGFIX -- v3/v4 excluded ''assembly story''
+  but gold treats assembly/installation as product-intrinsic; now canonical facets. (2) canonical list
+  extended (reliability, portability, size vs sizing accuracy vs fit distinctions) with an about-not-related
+  rule -- v4 over-applied canonical names (26 ease-of-use, 21 fit FPs). (3) value restraint hardened to
+  if-in-doubt-omit (39 FPs). (4) competitor-comparison few-shot -- v4 extracted alternative products''
+  specs as facets. (5) salience: 1-4 typical (v4 emitted ~3.7/review vs gold ~2.6).'
+version: v5
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'battery life'.
+  - When a claim fits a common dimension, use EXACTLY these canonical names: 'appearance' (looks, finish, color, style), 'build quality' (solid, sturdy, well made, materials), 'durability' (physical wear over time), 'reliability' (keeps working consistently), 'effectiveness' (does its job well), 'ease of use', 'comfort', 'size' (how big or small it is), 'sizing accuracy' (matches the labeled size), 'fit' (fits the body or intended object), 'assembly' (putting it together), 'installation', 'portability', 'included accessories'. Otherwise invent the most standard general name; never a compound or mechanism-specific phrase.
+  - Use the facet the claim is ABOUT, not a related one: time-consuming assembly is 'assembly' negative, not 'ease of use'; a product that suits a small room is 'size', not 'fit'.
+  - Two claims about the same dimension are ONE facet.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only. NOT aspects: delivery, shipping, packaging condition, the seller, customer service or support, warranty or refund handling, the listing or description accuracy, and the buying story.
+  - Claims about OTHER products (alternatives the reviewer compares against) are never facets of this product -- extract only what is said about the reviewed product itself.
+  - A price or worth-the-money remark is a facet ('value') ONLY when it is one of the review's main judgments. If in doubt, omit 'value'.
+  - For media products (books, music, movies, games), the content dimensions ARE the product: 'plot', 'characters', 'writing quality', 'sound quality'. Never return an empty list just because the product is a book or recording.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Most reviews express 1-4 facets; extract only the most salient (hard cap 6), only claims the reviewer actually makes -- never infer a dimension that is not stated. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    A hero you'll love to hate and a heroine you root for. The story grips you from page one, though the prose gets repetitive in the middle chapters.
+  assistant:
+    aspects:
+    - facet: characters
+      polarity: positive
+      evidence: A hero you'll love to hate and a heroine you root for
+    - facet: plot
+      polarity: positive
+      evidence: The story grips you from page one
+    - facet: writing quality
+      polarity: negative
+      evidence: the prose gets repetitive in the middle chapters
+- user: |-
+    Extremely powerful washer, quality product at a reasonable price. Customer support never answered my email though.
+  assistant:
+    aspects:
+    - facet: power
+      polarity: positive
+      evidence: Extremely powerful washer
+    - facet: build quality
+      polarity: positive
+      evidence: quality product
+- user: |-
+    Decent tablet but honestly the Samsung tab A is better value - bigger screen, louder speakers, and it costs less. This one does have a nice crisp display though.
+  assistant:
+    aspects:
+    - facet: display quality
+      polarity: positive
+      evidence: does have a nice crisp display

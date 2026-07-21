@@ -45,7 +45,7 @@ CLUSTER_MAX = 10
 DENSE_ENCODER = "BAAI/bge-small-en-v1.5"        # shared dense encoder (retrieval + KPA)
 EXTRACTION_MODEL = "qwen3:8b"                    # per-review aspect extraction, local via Ollama
 PROMPTS = ROOT / "prompts"                       # versioned prompt artifacts (one YAML per version)
-EXTRACTION_PROMPT_VERSION = "v2"                 # active prompt: prompts/review_aspects/<v>.yaml
+EXTRACTION_PROMPT_VERSION = "v11"                # active prompt: prompts/review_aspects/<v>.yaml
 
 BACKOFF_FLOOR = 1_000                           # min reviews for a category bucket to be mined
 ASPECT_TOP_K = 8                                # facets kept per product (tunable)

@@ -282,7 +282,39 @@ a repeated finalize is logged as a protocol violation. The datasheet reports the
 test score with its bootstrap CI, plus the candidate lineage (every prompt version, parent,
 and rationale).
 
-**Status: DECIDED (design) · PENDING (harness implementation).**
+### 5.4 Round 1 results (2026-07-21, 10 candidates)
+
+Harness implemented as `scripts/optimize_extraction_prompt.py` (per-example dev scores,
+lineage state, reflection packets with annotator rationales) with Claude as the reflector;
+candidates are the versioned prompt artifacts v3–v12. Full dev evaluation per candidate,
+as designed. Curve: `reports/gepa_f1_curve.png` (`scripts/plot_gepa_curve.py`).
+
+| candidate | key change | F1 | P | R | pol |
+|---|---|---|---|---|---|
+| v2 (baseline) | hand-written few-shot | 0.4685 | 0.420 | 0.529 | 0.910 |
+| v3 | media rule, canonical naming | 0.4665 | 0.393 | 0.575 | 0.906 |
+| v4 | canonical list, value restraint | 0.4783 | 0.411 | 0.572 | 0.921 |
+| v5 | assembly bugfix, comparison shot | 0.4815 | 0.423 | 0.559 | 0.923 |
+| v6 | value few-shot (reverted later) | 0.4806 | 0.413 | 0.575 | 0.921 |
+| v7 | value suppression, gold vocabulary | 0.4618 | 0.407 | 0.534 | 0.945 |
+| v8 | functionality gate, material fix | 0.4783 | 0.423 | 0.550 | 0.938 |
+| v9 | coverage push | 0.4870 | 0.425 | 0.570 | 0.929 |
+| v10 | facet dedup, experiential media | 0.4842 | 0.420 | 0.572 | 0.945 |
+| **v11** | **vague-name ban** | **0.4895** | **0.424** | **0.579** | **0.922** |
+| v12 | durability demonstration | 0.4825 | 0.415 | 0.577 | 0.922 |
+
+**Selection: v11** (best F1 and recall; promoted to `EXTRACTION_PROMPT_VERSION`). Honest
+read: the paired per-review delta vs v2 is **+0.032, 95% CI [−0.017, +0.081]** — the
+dev-248 improvement is not yet distinguishable from noise, exactly the <5 pp ambiguity
+the §4.1 sizing table predicts during search. Qualitative gains are real regardless
+(the assembly-exclusion bug found and fixed, gold-vocabulary alignment, contradictory
+duplicate facets eliminated). The reported number remains test-only via §5.3; **test has
+not been touched**. Notable negative results, kept for the record: total value
+suppression (v7) freed emission that leaked into other FPs; the durability
+misapplication survived four rule rewrites and one demonstration (v12) — likely at the
+8B instruction-following ceiling.
+
+**Status: DECIDED · harness implemented (round 1 run; test untouched).**
 
 ---
 
@@ -329,5 +361,5 @@ held-out scores with CIs, star-consistency results by slice, and known limitatio
 | Gold set (600; dev 248 / test 350 frozen) | **DONE** — labeled, arbitrated, frozen 2026-07-21; proportional sampler mode pending |
 | Metrics (semantic-match P/R/F1, matched-only polarity, bootstrap) | DECIDED, implemented — baseline v2 scored on dev (`eval_gold.py`) |
 | Star cross-check | DECIDED — function pending |
-| Optimization harness (§5) | DECIDED (design) — implementation pending |
+| Optimization harness (§5) | implemented — round 1 run (10 candidates, v11 selected; §5.4) |
 | v1 scope (full vs first-k) | OPEN — decided by pilot throughput |
