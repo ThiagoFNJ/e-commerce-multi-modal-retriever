@@ -1,9 +1,18 @@
 # Review Aspect Extraction — Engine, Quality Measurement, and Prompt Optimization
 
-Status: **draft**. Companion to `system-design.md` §2, which owns the review-aspect
-pipeline's shape (KPA, neutral facets, adaptive-backoff buckets). This document owns the
-extraction stage's internals: the local-LLM engine, the prompt, resilience, how quality is
-measured, and how the prompt is optimized before the full corpus pass.
+Status: **RETIRED from the ingestion path** — the stage is preserved as a measured result.
+The throughput pilot (200 corpus-sampled reviews, Qwen3-8B via Ollama, sequential on the
+development machine) measured **5.21 s/review**, which extrapolates to **~239 days** for the
+3,962,238-review corpus (~80 days even at first-k = 5, itself rejected for discarding most
+of the signal). The review channel is now per-sentence chunk embedding — see
+`system-design.md` §2, with this path recorded in §2.1. Everything below (engine, gold set,
+metrics, optimization design) remains valid and available for the scoped
+extraction-vs-chunking follow-up on a judged subset.
+
+Companion to `system-design.md` §2.1, which owns the review-aspect pipeline's shape (KPA,
+neutral facets, adaptive-backoff buckets). This document owns the extraction stage's
+internals: the local-LLM engine, the prompt, resilience, how quality is measured, and how
+the prompt is optimized before a corpus pass.
 
 Code: `src/emmr/reviews/extract.py` (engine, checkpointing), `src/emmr/reviews/goldset.py`
 (gold set, metrics), `scripts/05_extract_review_aspects.py` (pilot / full pass / finalize).
@@ -90,9 +99,16 @@ generic zero-shot prompting well below fine-tuned quality on aspect extraction, 
 closed by engineered prompting — constrained decoding plus few-shot demonstrations — which
 is exactly this configuration.
 
-**Status: DECIDED (v2 is the starting candidate; the text evolves under §4 and is versioned
-there — the prompt in `extract.py` is replaced by the optimization winner before the full
-pass).**
+**Prompts are versioned artifacts, not code.** Each prompt version is one immutable YAML
+under `prompts/review_aspects/` (system text, few-shot pairs, and metadata: `parent`
+lineage, `notes`, measured `scores`). `emmr.reviews.prompts` loads them; the active version
+is `config.EXTRACTION_PROMPT_VERSION`, and `eval_gold.py --tag <version>` scores any
+version against gold with per-version prediction checkpoints. The optimization loop (§5)
+evolves prompts by writing new files with `parent` set — `save_prompt` refuses to
+overwrite, so every reported score points at an immutable artifact.
+
+**Status: DECIDED (v2 = `prompts/review_aspects/v2.yaml`, the starting candidate; the
+winner selected under §5 becomes the active version before the full pass).**
 
 ---
 
@@ -148,6 +164,23 @@ objective — they are a corpus-scale consistency signal only.
   during search, which is acceptable because the reported number comes from test.
 - **The test split is touched exactly once**, by the selected winner (§4.4).
 
+**Realized (2026-07-21).** 598/600 reviewed (2 skipped), frozen **dev 248 / test 350**
+(`gold_{dev,test}.jsonl`). Draft-vs-gold agreement: 470/598 rows unchanged, 59 facets
+added, 91 removed, 19 polarity corrections — the annotator actively edited, not
+rubber-stamped. Five contested rows went through joint arbitration; the rulings are now
+part of the annotation instructions and bind the test pass:
+
+1. **Process facets are out of scope** — "quality control", "listing accuracy", and other
+   attributes of manufacturing, the listing, or the transaction are not product dimensions.
+2. **Generic operability claims map to the canonical facet `functionality`** — "it works",
+   "works well" is real (topical) signal; one canonical name keeps the Mine step dedup
+   clean instead of fragmenting.
+3. **Value-for-money is in scope** — "expensive but okay" is a product-intrinsic judgment
+   (`value`), unlike delivery/seller/packaging which stay excluded.
+
+Known limitation, recorded for the datasheet: gold labels were produced by correcting
+machine drafts, which anchors the annotation toward the drafting model's outputs.
+
 ### 4.2 Metrics (gold)
 
 Per review, predictions are matched to gold aspects **greedily, one-to-one, by cosine
@@ -161,6 +194,20 @@ similarity of the facet strings in the shared dense encoder space** (threshold �
   double-counted.
 - Aggregation over reviews; CIs by **bootstrap over reviews** (aspects within a review are
   correlated — same discipline as the query-level bootstrap in `evaluation-plan.md`).
+
+**Baseline (prompt v2, Qwen3-8B, dev-248, 2026-07-21, `scripts/eval_gold.py`):**
+
+| matcher | P | R | F1 | polarity acc (matched) |
+|---|---|---|---|---|
+| semantic (θ=0.80) | 0.420 | 0.529 | **0.469** [0.426, 0.509] | **0.910** [0.872, 0.946] |
+| exact string | 0.237 | 0.299 | 0.264 | 0.909 |
+
+Reading: polarity is already strong (consistent with the neutral-facet design dropping the
+weakest sub-task); facet F1 sits at the bottom of the literature's 46–65 ATE band with
+precision < recall — the extractor **over-generates**, largely the process facets the gold
+rulings exclude (§4.1). That makes precision the obvious first target for §5. The
+exact-vs-semantic gap (0.26 vs 0.47) confirms facet wording varies enough that semantic
+matching — and the Mine step's dedup — are load-bearing.
 
 ### 4.3 Star cross-check (corpus scale)
 
@@ -277,10 +324,10 @@ held-out scores with CIs, star-consistency results by slice, and known limitatio
 | item | status |
 |---|---|
 | Engine (Qwen3-8B / Ollama, constrained JSON, per-review) | DECIDED, implemented |
-| Prompt v2 (few-shot, ontology, evidence) | DECIDED, implemented — evolves under §5 |
+| Prompt v2 (few-shot, ontology, evidence) | DECIDED, implemented — versioned artifact (`prompts/review_aspects/v2.yaml`), evolves under §5 |
 | Resilience (JSONL checkpoint, cache, retry semantics) | DECIDED, implemented |
-| Gold set (600; dev 250 / test 350; proportional test) | DECIDED — labeling pending; proportional sampler mode pending |
-| Metrics (semantic-match P/R/F1, matched-only polarity, bootstrap) | DECIDED, implemented |
+| Gold set (600; dev 248 / test 350 frozen) | **DONE** — labeled, arbitrated, frozen 2026-07-21; proportional sampler mode pending |
+| Metrics (semantic-match P/R/F1, matched-only polarity, bootstrap) | DECIDED, implemented — baseline v2 scored on dev (`eval_gold.py`) |
 | Star cross-check | DECIDED — function pending |
 | Optimization harness (§5) | DECIDED (design) — implementation pending |
 | v1 scope (full vs first-k) | OPEN — decided by pilot throughput |
