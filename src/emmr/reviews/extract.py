@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from emmr import config
+from emmr.reviews import prompts
 
 ASPECT_SCHEMA = {
     "type": "object",
@@ -47,62 +48,12 @@ ASPECT_SCHEMA = {
     "additionalProperties": False,
 }
 
-SYSTEM = """You extract product aspects from one customer review.
-
-Rules:
-- A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the \
-product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
-- Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> \
-facet 'sizing accuracy', polarity 'negative'.
-- Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the \
-price paid, and customer service -- they are not aspects of the product.
-- Never the product category itself ('boots' is not a facet of boots); no brand names.
-- Facets are always English, even when the review is not.
-- 'evidence' is a short verbatim quote from the review supporting the facet.
-- Deduplicate facets. At most 6, the most salient. If the review discusses no concrete \
-product dimension, return an empty list."""
-
-# Few-shot pairs covering the known failure modes: multi-aspect with negation,
-# trivial review -> empty list, opinion->dimension + fulfillment exclusion, and
-# non-English input -> English facets (evidence stays verbatim).
-FEW_SHOT: list[tuple[str, dict]] = [
-    (
-        "These boots have amazing arch support and great grip on wet trails, but they are "
-        "not really waterproof - my socks were soaked after an hour of light rain.",
-        {"aspects": [
-            {"facet": "arch support", "polarity": "positive",
-             "evidence": "amazing arch support"},
-            {"facet": "traction", "polarity": "positive",
-             "evidence": "great grip on wet trails"},
-            {"facet": "waterproofing", "polarity": "negative",
-             "evidence": "not really waterproof - my socks were soaked"},
-        ]},
-    ),
-    (
-        "Love it!!! Five stars.",
-        {"aspects": []},
-    ),
-    (
-        "Runs small, order a size up. Also the box arrived crushed but the seller shipped "
-        "a replacement quickly.",
-        {"aspects": [
-            {"facet": "sizing accuracy", "polarity": "negative",
-             "evidence": "Runs small, order a size up"},
-        ]},
-    ),
-    (
-        "Muy comodo y el material se siente de buena calidad, aunque el color es mas "
-        "oscuro que en las fotos.",
-        {"aspects": [
-            {"facet": "comfort", "polarity": "positive",
-             "evidence": "Muy comodo"},
-            {"facet": "material quality", "polarity": "positive",
-             "evidence": "el material se siente de buena calidad"},
-            {"facet": "color accuracy", "polarity": "negative",
-             "evidence": "el color es mas oscuro que en las fotos"},
-        ]},
-    ),
-]
+# The prompt is a versioned artifact (prompts/review_aspects/<version>.yaml), loaded here
+# at import for the active version. SYSTEM / FEW_SHOT stay as module names so the default
+# path and tests read naturally; candidate prompts are passed explicitly instead.
+_ACTIVE_PROMPT = prompts.load_prompt()
+SYSTEM = _ACTIVE_PROMPT.system
+FEW_SHOT = _ACTIVE_PROMPT.few_shot
 
 
 @dataclass(frozen=True)
@@ -117,10 +68,11 @@ def review_key(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
 
 
-def build_messages(text: str) -> list[dict]:
+def build_messages(text: str, prompt: prompts.Prompt | None = None) -> list[dict]:
     """System + few-shot pairs + the review. The shared prefix is prompt-cache friendly."""
-    messages = [{"role": "system", "content": SYSTEM}]
-    for example_text, example_response in FEW_SHOT:
+    prompt = prompt or _ACTIVE_PROMPT
+    messages = [{"role": "system", "content": prompt.system}]
+    for example_text, example_response in prompt.few_shot:
         messages.append({"role": "user", "content": example_text})
         messages.append({"role": "assistant", "content": json.dumps(example_response)})
     messages.append({"role": "user", "content": text})
@@ -150,12 +102,18 @@ def _ollama_chat(**kwargs):
     return ollama.chat(**kwargs)
 
 
-def extract_one(text: str, model: str = config.EXTRACTION_MODEL, *, chat=None) -> list[Aspect]:
+def extract_one(
+    text: str,
+    model: str = config.EXTRACTION_MODEL,
+    *,
+    chat=None,
+    prompt: prompts.Prompt | None = None,
+) -> list[Aspect]:
     """Extract aspects from one review. `chat` is injectable for testing (defaults to Ollama)."""
     chat = chat or _ollama_chat
     response = chat(
         model=model,
-        messages=build_messages(text),
+        messages=build_messages(text, prompt),
         format=ASPECT_SCHEMA,   # grammar-constrained -> guaranteed schema-valid JSON
         think=False,            # Qwen3 is a thinking model; off for cheap deterministic extraction
         options={"temperature": 0},
@@ -196,6 +154,7 @@ def run_extraction(
     *,
     chat=None,
     on_error=None,
+    prompt: prompts.Prompt | None = None,
 ) -> dict:
     """Extract aspects for `rows` (iterable of (asin, review_no, text)), resumably.
 
@@ -220,7 +179,7 @@ def run_extraction(
                 stats["cached"] += 1
             else:
                 try:
-                    aspects = extract_one(text, model, chat=chat)
+                    aspects = extract_one(text, model, chat=chat, prompt=prompt)
                 except Exception as exc:  # noqa: BLE001 - a bad review must not kill the batch
                     stats["failed"] += 1
                     if on_error is not None:
