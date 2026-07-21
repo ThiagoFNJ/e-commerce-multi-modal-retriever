@@ -125,7 +125,7 @@ move as data is added incrementally, simulating production ingestion / degradati
   haystack grows.
 - **Reviews-per-product sweep** (0 / 1 / 3 / 7 / 13) → Stage-2 NDCG of the review channel as
   review volume grows — probes whether the review signal needs volume to pay off, and the
-  ≤13-review sparsity ceiling directly. Also bounds extraction cost: the cheap arms run first,
-  and only justify the full pass if the curve is still climbing at 13.
+  ≤13-review sparsity ceiling directly. With per-sentence chunk embedding
+  (`system-design.md` §2) every arm is cheap, so the sweep is purely a signal-volume probe.
 - Optional realism variant: a **temporal split** on review dates (older reviews = initial
   index, newer = incremental additions) instead of random coverage.
