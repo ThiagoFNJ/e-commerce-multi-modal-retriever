@@ -127,7 +127,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     ev = sub.add_parser("eval", help="evaluate one candidate on dev, write scores + packet")
-    ev.add_argument("--tag", required=True)
+    ev.add_argument("--tag", required=True, help="label for checkpoint/eval/packet files")
+    ev.add_argument("--prompt", default=None, help="prompt version (default: same as --tag)")
+    ev.add_argument("--model", default=None, help="ollama model (default: config.EXTRACTION_MODEL)")
     ev.add_argument("--threshold", type=float, default=0.80)
     sub.add_parser("status", help="print the candidate pool")
     args = ap.parse_args()
@@ -146,7 +148,8 @@ def main() -> None:
                   f'F1={m["facet_f1"]:.3f} pol={m["polarity_accuracy"]}')
         return
 
-    prompt = load_prompt(args.tag)
+    prompt = load_prompt(args.prompt or args.tag)
+    model = args.model or config.EXTRACTION_MODEL
     gold = load_gold(GOLD_DIR / "gold_dev.jsonl")
     gold_meta, rows = {}, []
     with open(GOLD_DIR / "gold_dev.jsonl") as f:
@@ -161,7 +164,7 @@ def main() -> None:
             rows.append((rec["asin"], rec["review_no"], rec["text"]))
 
     checkpoint = GOLD_DIR / f"pred_dev_{args.tag}.jsonl"
-    stats = run_extraction(rows, checkpoint_path=checkpoint, prompt=prompt)
+    stats = run_extraction(rows, checkpoint_path=checkpoint, model=model, prompt=prompt)
     logging.info("extraction: %s", stats)
 
     pred = load_predictions(checkpoint)
@@ -178,6 +181,7 @@ def main() -> None:
     with open(state_path, "a") as f:
         f.write(json.dumps({
             "tag": args.tag, "parent": prompt.meta.get("parent"),
+            "prompt": prompt.version, "model": model,
             "date": date.today().isoformat(), "metrics": metrics,
         }) + "\n")
     write_packet(args.tag, examples, gold_meta, pred, GEPA_DIR / "reflection" / f"{args.tag}_packet.md")

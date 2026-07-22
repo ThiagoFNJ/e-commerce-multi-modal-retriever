@@ -316,6 +316,53 @@ misapplication survived four rule rewrites and one demonstration (v12) — likel
 
 **Status: DECIDED · harness implemented (round 1 run; test untouched).**
 
+### 5.5 Extractor model selection (2026-07-22)
+
+Round 1's conclusion — F1 pinned in a 0.46–0.49 band across ten materially different
+prompts — pointed at the model, not the prompt. Tested: a two-stage bracket of local
+models on the same gold set, same harness. **Stage 1 (screening):** each candidate scored
+dev with the shared anchors v2 and v11. **Stage 2:** the top models got their own
+reflection rounds (branched from v11; the v2-origin anchor lives in screening). Claude
+Haiku 4.5 was run once with v11 (batched 25 reviews/call through agent tooling) as an
+API-grade reference. Curve: `reports/model_selection_f1.png`.
+
+| model | v2 | v11 | own rounds (best) | paired Δ vs qwen3:8b-v11 |
+|---|---|---|---|---|
+| **gemma4:12b** | 0.5442 | **0.5753** | 0.5724, 0.5643 | **+0.086 [+0.033, +0.142]** |
+| qwen3:14b | 0.4801 | 0.5549 | 0.5562 | +0.067 [+0.019, +0.117] |
+| llama3.1:8b | 0.4309 | 0.5005 | — | n.s. |
+| qwen3:8b (round 1) | 0.4685 | 0.4895 | — | — |
+| Haiku 4.5 (reference) | — | 0.5767 | — | vs gemma4-v11: +0.000 [−0.042, +0.042] |
+
+Findings:
+
+1. **Model choice dominates prompt optimization** on this task: the best between-model
+   gap (+8.6 pp, significant) is 4× the best within-model prompt gain (+2.1 pp, n.s.).
+2. **A ~0.58 ceiling, shared by independent strong models.** Gemma 4 12B (local, 7.6 GB)
+   and Haiku 4.5 (API) land statistically identical; per-iteration edits move all strong
+   models sub-noise. The residual is concentrated in symmetric FP/FN on the same
+   canonical names — annotation-boundary variance, not model failure. Pushing past it
+   means revisiting the gold taxonomy or the matcher threshold, not more prompting.
+3. **v11 transfers across models** (+3 to +7 pp over v2 everywhere): its edits are mostly
+   gold-schema alignments, not Qwen-specific patches.
+4. **"Llama 3.3 8B" from benchmark listicles does not exist as an Ollama artifact**
+   (only the 70B); llama3.1:8b substituted, and screened out.
+
+**Incident, for the record:** the first qwen3:14b screening scores (0.08, 0.32) were
+artifacts of silent embedding corruption — with a 9.3 GB model resident in Ollama on the
+16 GB machine, the matcher's MPS command buffers failed GPU-OOM and returned garbage
+embeddings without raising (identity pairs stopped matching). Fix: `cosine_matcher` is
+now CPU-pinned with a hard-failing identity canary; **every previously reported number
+was re-scored under the hardened matcher and reproduced exactly** except the two
+poisoned qwen14 evals, which were corrected. Lesson recorded: metric infrastructure
+gets the same silent-failure scrutiny as data pipelines.
+
+**Selection: gemma4:12b + prompt v11** (`EXTRACTION_MODEL`, `EXTRACTION_PROMPT_VERSION`)
+for the scoped extraction experiment — matches the API reference at zero cash cost, fits
+both the 16 GB dev machine and an L4 under vLLM for any larger pass. Qwen3-14B is the
+recorded runner-up (statistically tied, −2 pp point estimate, same local speed). Test-350
+remains untouched; it will score the selected (model, prompt) pair once, via §5.3.
+
 ---
 
 ## 6. Operational sequence and decision gates

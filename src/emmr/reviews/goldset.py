@@ -361,12 +361,19 @@ def exact_match(pred_facet: str, gold_facet: str) -> bool:
 
 
 def cosine_matcher(threshold: float = 0.80):
-    """Semantic facet matcher on the shared dense encoder ("sizing" ~ "sizing accuracy")."""
+    """Semantic facet matcher on the shared dense encoder ("sizing" ~ "sizing accuracy").
+
+    Runs on CPU deliberately: under memory pressure (e.g. a large Ollama model resident),
+    MPS command buffers can fail with GPU-OOM and silently return garbage embeddings --
+    identity pairs stop matching and every score deflates. CPU is immune, and this model
+    is small enough that matcher throughput is irrelevant. A canary identity check guards
+    against any other silent-corruption mode.
+    """
     from sentence_transformers import SentenceTransformer
 
     from emmr import config
 
-    model = SentenceTransformer(config.DENSE_ENCODER)
+    model = SentenceTransformer(config.DENSE_ENCODER, device="cpu")
     cache: dict = {}
 
     def embed(facet: str):
@@ -377,6 +384,8 @@ def cosine_matcher(threshold: float = 0.80):
     def match(pred_facet: str, gold_facet: str) -> bool:
         return float(embed(pred_facet) @ embed(gold_facet)) >= threshold
 
+    if not match("canary facet", "canary facet"):  # identity must match at any threshold <= 1
+        raise RuntimeError("cosine_matcher self-check failed: encoder returned corrupt embeddings")
     return match
 
 

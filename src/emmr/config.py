@@ -43,7 +43,8 @@ CLUSTER_MAX = 10
 
 # --- Review-aspect pipeline (KPA) ---
 DENSE_ENCODER = "BAAI/bge-small-en-v1.5"        # shared dense encoder (retrieval + KPA)
-EXTRACTION_MODEL = "qwen3:8b"                    # per-review aspect extraction, local via Ollama
+EXTRACTION_MODEL = "gemma4:12b"                  # per-review aspect extraction, local via Ollama
+                                                 # (selected by the 5.5 model bracket; qwen3:14b runner-up)
 PROMPTS = ROOT / "prompts"                       # versioned prompt artifacts (one YAML per version)
 EXTRACTION_PROMPT_VERSION = "v11"                # active prompt: prompts/review_aspects/<v>.yaml
 
