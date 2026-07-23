@@ -2,6 +2,7 @@
 # Idempotent startup for the extraction GPU VM (runs on every boot, incl. spot restarts).
 # Assumes a GCP Deep Learning VM image (NVIDIA driver + conda python preinstalled).
 set -euo pipefail
+export PIP_BREAK_SYSTEM_PACKAGES=1  # PEP 668: ubuntu 24.04 marks system python externally-managed; fine on a disposable VM
 exec > /var/log/emmr-startup.log 2>&1
 echo "=== emmr startup $(date -u +%FT%TZ) ==="
 
