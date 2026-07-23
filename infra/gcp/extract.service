@@ -7,7 +7,7 @@ Requires=vllm.service
 WorkingDirectory=/opt/emmr/repo
 # wait for the vLLM health endpoint before starting work
 ExecStartPre=/bin/bash -c 'until curl -sf http://localhost:8000/health; do sleep 5; done'
-ExecStart=/usr/bin/python3 scripts/05_extract_review_aspects.py \
+ExecStart=/opt/emmr/venv/bin/python scripts/05_extract_review_aspects.py \
   --input /opt/emmr/data/reviews_slim.parquet \
   --workers 32
 Environment=EMMR_EXTRACTION_BACKEND=openai

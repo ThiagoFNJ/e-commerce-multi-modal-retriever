@@ -2,7 +2,6 @@
 # Idempotent startup for the extraction GPU VM (runs on every boot, incl. spot restarts).
 # Assumes a GCP Deep Learning VM image (NVIDIA driver + conda python preinstalled).
 set -euo pipefail
-export PIP_BREAK_SYSTEM_PACKAGES=1  # PEP 668: ubuntu 24.04 marks system python externally-managed; fine on a disposable VM
 exec > /var/log/emmr-startup.log 2>&1
 echo "=== emmr startup $(date -u +%FT%TZ) ==="
 
@@ -22,10 +21,11 @@ else
   git -C repo fetch origin "$BRANCH" && git -C repo reset --hard "origin/$BRANCH"
 fi
 
-# --- python env (system python; the ubuntu DLVM images have no /opt/conda) ---
-apt-get install -y -q python3-pip git >/dev/null 2>&1 || true
-PY=/usr/bin/python3
-$PY -m pip show vllm >/dev/null 2>&1 || $PY -m pip install -q vllm
+# --- python env: dedicated venv, fully isolated from debian's system packages ---
+apt-get install -y -q python3-venv git >/dev/null 2>&1 || true
+[ -d "$WORKDIR/venv" ] || /usr/bin/python3 -m venv "$WORKDIR/venv"
+PY="$WORKDIR/venv/bin/python"
+$PY -m pip show vllm >/dev/null 2>&1 || $PY -m pip install -q --upgrade pip vllm
 $PY -m pip show emmr >/dev/null 2>&1 || {
   $PY -m pip install -q pandas pyarrow httpx pyyaml tqdm ollama
   $PY -m pip install -q --no-deps -e "$WORKDIR/repo"
