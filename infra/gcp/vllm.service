@@ -6,6 +6,7 @@ After=network-online.target
 ExecStart=/opt/emmr/venv/bin/vllm serve google/gemma-4-12B \
   --dtype bfloat16 \
   --max-model-len 4096 \
+  --chat-template /opt/emmr/repo/infra/gcp/gemma_chat_template.jinja \
   --gpu-memory-utilization 0.92 \
   --port 8000
 Restart=always
