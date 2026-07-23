@@ -22,7 +22,7 @@ else
 fi
 
 # --- python env: dedicated venv, fully isolated from debian's system packages ---
-apt-get install -y -q python3-venv python3-dev build-essential git >/dev/null 2>&1 || true
+apt-get install -y -q python3-venv python3-dev build-essential ninja-build git >/dev/null 2>&1 || true
 [ -d "$WORKDIR/venv" ] || /usr/bin/python3 -m venv "$WORKDIR/venv"
 PY="$WORKDIR/venv/bin/python"
 $PY -m pip show vllm >/dev/null 2>&1 || $PY -m pip install -q --upgrade pip vllm
