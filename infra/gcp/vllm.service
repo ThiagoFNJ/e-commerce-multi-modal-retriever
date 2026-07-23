@@ -7,7 +7,6 @@ ExecStart=/opt/emmr/venv/bin/vllm serve google/gemma-4-12B \
   --dtype bfloat16 \
   --max-model-len 4096 \
   --gpu-memory-utilization 0.92 \
-  --disable-log-requests \
   --port 8000
 Restart=always
 RestartSec=10
