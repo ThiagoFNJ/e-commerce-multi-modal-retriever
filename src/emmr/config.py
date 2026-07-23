@@ -11,6 +11,7 @@ contract lives in one place instead of being duplicated across scripts.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,6 +49,12 @@ EXTRACTION_MODEL = "gemma4:12b"                  # per-review aspect extraction,
 PROMPTS = ROOT / "prompts"                       # versioned prompt artifacts (one YAML per version)
 EXTRACTION_PROMPT_VERSION = "gm10"               # active prompt: prompts/review_aspects/<v>.yaml
                                                  # (5.6 honest-loop winner for gemma4:12b)
+
+# Extraction serving backend. "ollama" = native local API (dev default); "openai" = any
+# OpenAI-compatible /v1 endpoint (vLLM on the GPU box; Ollama's own /v1 for local tests).
+EXTRACTION_BACKEND = os.environ.get("EMMR_EXTRACTION_BACKEND", "ollama")
+EXTRACTION_ENDPOINT = os.environ.get("EMMR_EXTRACTION_ENDPOINT", "http://localhost:11434/v1")
+EXTRACTION_ENDPOINT_MODEL = os.environ.get("EMMR_EXTRACTION_ENDPOINT_MODEL", "")  # "" -> EXTRACTION_MODEL
 
 BACKOFF_FLOOR = 1_000                           # min reviews for a category bucket to be mined
 ASPECT_TOP_K = 8                                # facets kept per product (tunable)

@@ -21,7 +21,12 @@ import logging
 import time
 
 from emmr import config
-from emmr.reviews.extract import finalize_checkpoint, load_checkpoint, run_extraction
+from emmr.reviews.extract import (
+    finalize_checkpoint,
+    load_checkpoint,
+    run_extraction,
+    run_extraction_concurrent,
+)
 from emmr.reviews.loading import load_reviews
 
 
@@ -29,6 +34,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pilot", type=int, default=0, help="run on a random sample of N reviews")
     ap.add_argument("--model", default=config.EXTRACTION_MODEL)
+    ap.add_argument("--workers", type=int, default=1,
+                    help=">1 keeps N model calls in flight (batching servers, e.g. vLLM)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--finalize", action="store_true",
                     help="compact the checkpoint into the review-grain parquet and exit")
@@ -55,7 +62,10 @@ def main() -> None:
 
     rows = list(reviews[["asin", "review_no", "text"]].itertuples(index=False, name=None))
     start = time.monotonic()
-    stats = run_extraction(
+    runner = run_extraction if args.workers <= 1 else (
+        lambda *a, **kw: run_extraction_concurrent(*a, workers=args.workers, **kw)
+    )
+    stats = runner(
         tqdm(rows, desc="extract"),
         model=args.model,
         on_error=lambda asin, no, exc: logging.warning("failed %s#%d: %s", asin, no, exc),

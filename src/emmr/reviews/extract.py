@@ -102,6 +102,48 @@ def _ollama_chat(**kwargs):
     return ollama.chat(**kwargs)
 
 
+def _openai_chat(**kwargs):
+    """OpenAI-compatible /v1 backend (vLLM on GPU; Ollama's /v1 for local parity tests).
+
+    Maps the internal call shape onto the wire format both servers accept: the JSON
+    schema rides in `response_format` (vLLM: guided decoding; Ollama: grammar constraint),
+    temperature 0. Returns an ollama-shaped dict so `_content` stays backend-agnostic.
+    Thinking is disabled via `reasoning_effort: "none"` — the /v1 mapping that Ollama
+    actually honors (its native `think` flag is silently ignored on /v1, which leaves
+    reasoning ON: the model burns its token budget thinking and returns an empty
+    content with finish_reason=length). Servers that reject the field get one retry
+    without it.
+    """
+    import httpx
+
+    payload = {
+        "model": config.EXTRACTION_ENDPOINT_MODEL or kwargs["model"],
+        "messages": kwargs["messages"],
+        "temperature": 0,
+        "reasoning_effort": "none",
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "review_aspects", "strict": True,
+                            "schema": kwargs.get("format") or ASPECT_SCHEMA},
+        },
+    }
+    url = config.EXTRACTION_ENDPOINT.rstrip("/") + "/chat/completions"
+    response = httpx.post(url, json=payload, timeout=300.0)
+    if response.status_code == 400 and "reasoning" in response.text:
+        payload.pop("reasoning_effort")
+        response = httpx.post(url, json=payload, timeout=300.0)
+    response.raise_for_status()
+    data = response.json()
+    return {"message": {"content": data["choices"][0]["message"]["content"]}}
+
+
+def default_chat():
+    """The chat callable selected by config.EXTRACTION_BACKEND."""
+    if config.EXTRACTION_BACKEND == "openai":
+        return _openai_chat
+    return _ollama_chat
+
+
 def extract_one(
     text: str,
     model: str = config.EXTRACTION_MODEL,
@@ -109,8 +151,9 @@ def extract_one(
     chat=None,
     prompt: prompts.Prompt | None = None,
 ) -> list[Aspect]:
-    """Extract aspects from one review. `chat` is injectable for testing (defaults to Ollama)."""
-    chat = chat or _ollama_chat
+    """Extract aspects from one review. `chat` is injectable for testing; the default
+    backend comes from config.EXTRACTION_BACKEND (ollama | openai-compatible)."""
+    chat = chat or default_chat()
     response = chat(
         model=model,
         messages=build_messages(text, prompt),
@@ -195,6 +238,91 @@ def run_extraction(
             }) + "\n")
             out.flush()
             done.add((asin, review_no))
+    return stats
+
+
+def run_extraction_concurrent(
+    rows,
+    checkpoint_path=config.REVIEW_ASPECTS_CHECKPOINT,
+    model: str = config.EXTRACTION_MODEL,
+    *,
+    chat=None,
+    on_error=None,
+    prompt=None,
+    workers: int = 8,
+) -> dict:
+    """`run_extraction` with `workers` model calls in flight (for batching servers).
+
+    Same contract: resumable checkpoint, content-hash cache, failures retried next run.
+    Only the main thread writes the checkpoint (futures are consumed as they complete),
+    so the append-only crash-safety of the sequential path is preserved. The submission
+    window is bounded (4x workers) so a multi-million-row iterable never materializes.
+    Rows sharing identical text are extracted once: later duplicates are held back and
+    flushed from the cache after the first result lands.
+    """
+    from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+
+    checkpoint_path = Path(checkpoint_path)
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    done, cache = load_checkpoint(checkpoint_path)
+    stats = {"done_before": len(done), "extracted": 0, "cached": 0, "skipped": 0, "failed": 0}
+    window = max(workers * 4, workers)
+
+    with open(checkpoint_path, "a") as out, ThreadPoolExecutor(max_workers=workers) as pool:
+
+        def flush(asin, review_no, key, aspects):
+            out.write(json.dumps({
+                "asin": asin,
+                "review_no": review_no,
+                "review_md5": key,
+                "aspects": [asdict(a) for a in aspects],
+            }) + "\n")
+            out.flush()
+            done.add((asin, review_no))
+
+        in_flight: dict = {}          # future -> (asin, review_no, key)
+        pending_dupes: dict = {}      # key -> [(asin, review_no), ...] awaiting first result
+
+        def drain(return_when):
+            finished, _ = wait(list(in_flight), return_when=return_when)
+            for fut in finished:
+                asin, review_no, key = in_flight.pop(fut)
+                try:
+                    aspects = fut.result()
+                except Exception as exc:  # noqa: BLE001 - a bad review must not kill the batch
+                    stats["failed"] += 1
+                    if on_error is not None:
+                        on_error(asin, review_no, exc)
+                    pending_dupes.pop(key, None)  # dupes of a failure retry next run
+                    continue
+                cache[key] = aspects
+                flush(asin, review_no, key, aspects)
+                stats["extracted"] += 1
+                for d_asin, d_no in pending_dupes.pop(key, []):
+                    flush(d_asin, d_no, key, aspects)
+                    stats["cached"] += 1
+
+        for asin, review_no, text in rows:
+            if (asin, review_no) in done:
+                stats["skipped"] += 1
+                continue
+            key = review_key(text)
+            if key in cache:
+                flush(asin, review_no, key, cache[key])
+                stats["cached"] += 1
+                continue
+            if key in pending_dupes:
+                pending_dupes[key].append((asin, review_no))
+                continue
+            if any(k == key for _, _, k in in_flight.values()):
+                pending_dupes.setdefault(key, []).append((asin, review_no))
+                continue
+            while len(in_flight) >= window:
+                drain(FIRST_COMPLETED)
+            fut = pool.submit(extract_one, text, model, chat=chat, prompt=prompt)
+            in_flight[fut] = (asin, review_no, key)
+        while in_flight:
+            drain(FIRST_COMPLETED)
     return stats
 
 
