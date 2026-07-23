@@ -1,0 +1,134 @@
+parent: v2
+created: '2026-07-22'
+status: candidate
+model: qwen3:8b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Ranked the error masses by combined FP+FN weight and targeted the largest coherent clusters, all
+  naming-driven given the 0.80 semantic-match threshold. (1) build quality/durability is the single biggest
+  cluster: 20 missed ''build quality'' plus 12 ''durability'' + 4 ''product durability'' FP (36 total)
+  -- the prompt never distinguished the two concepts, so the model defaulted to ''durability'' for constructional
+  judgments that gold calls ''build quality'' (B000EOOQPW#11: gold build quality vs pred ''product durability''/''plastic
+  quality''; B0757MNXVL#10 and B07FYK2FJY#12: gold build quality vs pred ''material quality''). Added
+  an explicit distinction plus a new example. (2) ''appearance'' is the largest single missed-facet name
+  (21) and had zero mention in the prompt as a facet to extract; visual/aesthetic remarks were being dropped
+  entirely (B096NCTTV5#3, B07Y5WMGGG#12, B07BHKVZPX#8 all miss ''appearance'' outright). Added an explicit
+  rule plus coverage in both new examples. (3) price/value is the largest false-positive family (value
+  for money 9 + price 6 + value for price 5 = 20, e.g. B08NHPQMY5#6 predicts ''value for money'' and ''price''
+  on top of the one correct facet) even though the prompt already excludes ''price paid'' -- sharpened
+  the rule to name the exact bad facet strings. (4) size vs sizing accuracy is a direct one-for-one naming
+  collision visible in B07FYK2FJY#12 (gold ''size'' predicted as ''sizing accuracy'') and B096NCTTV5#3
+  (gold ''cup size'' missed); added an explicit split plus an example that shows a non-wearable, absolute-dimension
+  case. (5) effectiveness/functionality (9+9=18 missed) were repeatedly replaced by hyper-specific invented
+  compounds (''blue light filtering'', ''cleaning efficiency'', ''scalp massage effectiveness'', ''barrel
+  cleaning'' in B076GTTQLJ#4, B079NTYJG6#4, B08NHPQMY5#6) -- added a canonical-vocabulary rule that names
+  the standard terms to prefer. (6) ''included accessories'' (6 missed) was undefined in the prompt (B07WCRVJT9#1,
+  B07Y5WMGGG#12); added a rule and an example. (7) B01BPJLC6U#0 shows the model inventing ''assembly instructions:
+  neutral'' and ''battery installation: neutral'' from pure how-to narration with no opinion -- added
+  an evaluative-stance requirement and demonstrated it by omitting a procedural sentence in the new size/effectiveness
+  example. Two synthetic examples were added (the two-example budget) to jointly cover clusters 1/2/6
+  and 3/4/5/7; the four existing examples already score correctly and were left untouched.'
+change_summary: '1. Added canonical-vocabulary rule steering the model away from hyper-specific invented
+  facet names toward standard terms (targets effectiveness/functionality/durability-family FP sprawl).
+
+  2. Added explicit build quality vs durability distinction with usage cues for each (targets 20 missed
+  ''build quality'' + 16 durability-family FP).
+
+  3. Added explicit size vs sizing accuracy distinction, restricting ''sizing accuracy'' to wearables
+  (targets 9 missed ''size'' / 7 FP ''sizing accuracy'' naming collision).
+
+  4. Added an ''appearance'' rule requiring extraction of visual/aesthetic judgments (targets 21 missed
+  ''appearance'', the single largest miss category).
+
+  5. Added an ''included accessories'' rule, previously undefined in the prompt (targets 6 missed occurrences).
+
+  6. Sharpened the price/value exclusion to name ''price'' and ''value for money'' explicitly as disallowed
+  facets (targets 20 combined price-family FP).
+
+  7. Added an evaluative-stance requirement so purely factual/procedural narration (e.g. how to insert
+  batteries) does not spawn neutral facets (targets spurious facets seen in B01BPJLC6U#0).
+
+  8. Added 2 new synthetic few-shot examples jointly demonstrating build quality/durability/appearance/included
+  accessories and size/effectiveness/no-procedural-facet; the 4 existing examples are unchanged.'
+version: qe1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Prefer general, canonical dimension names over narrow invented sub-features. Common canonical facets: durability, build quality, appearance, size, sizing accuracy, effectiveness, functionality, ease of use, ease of cleaning, comfort, reliability, material, included accessories, portability, compatibility, adjustability, performance. Use one of these instead of a hyper-specific compound like 'scalp massage effectiveness' or 'barrel cleaning' whenever it fits.
+  - 'build quality' = perceived construction, craftsmanship, or robustness ('feels sturdy', 'well made', 'not as thick as the other one'). 'durability' = how the product holds up over time and wear ('still works after months', 'broke after a week'). Pick whichever the language actually supports; do not use both for the same statement.
+  - 'size' = the product's own physical/absolute dimensions ('the cup size', 'el tamano', 'the case is bigger than expected'). 'sizing accuracy' is only for wearables (clothing/shoes) fitting true to the size ordered ('runs small, order a size up').
+  - 'appearance' covers how the product looks (color, finish, style, visual design) -- extract it whenever the review makes a visual/aesthetic judgment, even a brief one ('looks great', 'looks ridiculous', 'love the finish').
+  - 'included accessories' names bundled items or tools that ship with the product, when the review comments on them.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, customer service, and anything about price, cost, or value for money (do not create facets like 'price' or 'value for money') -- none of these are aspects of the product itself.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - Only extract a facet when the review takes an evaluative stance on it (praise, complaint, or an explicit trade-off). Do not extract a facet from purely factual or procedural description with no judgment attached (e.g. how to insert batteries).
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    The stand feels solid and well made, though after six months of daily use one of the hinges started to squeak. It comes with a nice travel pouch and a cleaning cloth, which was a nice surprise. I paid more than I wanted to, but I don't mind since it looks great on my desk.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and well made
+    - facet: durability
+      polarity: negative
+      evidence: after six months of daily use one of the hinges started to squeak
+    - facet: included accessories
+      polarity: positive
+      evidence: comes with a nice travel pouch and a cleaning cloth
+    - facet: appearance
+      polarity: positive
+      evidence: looks great on my desk
+- user: |-
+    These reading glasses actually work - print that used to blur is sharp again. The case is a bit bigger than I expected, so it doesn't fit in my usual pocket. To put them on, you just unfold the arms and slide them over your ears.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: print that used to blur is sharp again
+    - facet: size
+      polarity: negative
+      evidence: case is a bit bigger than I expected

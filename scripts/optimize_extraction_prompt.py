@@ -132,10 +132,114 @@ def main() -> None:
     ev.add_argument("--model", default=None, help="ollama model (default: config.EXTRACTION_MODEL)")
     ev.add_argument("--threshold", type=float, default=0.80)
     sub.add_parser("status", help="print the candidate pool")
+    rq = sub.add_parser("request", help="assemble an isolated-reflector request file")
+    rq.add_argument("--tag", required=True, help="evaluated candidate tag to reflect on")
+    rq.add_argument("--prompt", required=True, help="prompt version of that candidate")
+    rq.add_argument("--out", required=True, help="request file path to write")
+    rq.add_argument("--loop-prefix", default=None,
+                    help="lineage prefix for this loop (e.g. qe); inferred from --prompt if omitted")
+    ing = sub.add_parser("ingest-reflection", help="validate a reflector response, save the candidate")
+    ing.add_argument("--response", required=True)
+    ing.add_argument("--version", required=True, help="new prompt version to save")
+    ing.add_argument("--parent", required=True)
+    ing.add_argument("--model", required=True, help="target model (recorded in notes)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     state_path = GEPA_DIR / "state.jsonl"
+    if args.cmd == "ingest-reflection":
+        from emmr.reviews.prompts import Prompt, save_prompt
+
+        doc = json.loads(Path(args.response).read_text())
+        for key in ("rationale", "change_summary", "system", "few_shot"):
+            assert key in doc, f"missing key {key}"
+        VALID_POL = {"positive", "negative", "neutral"}
+        few_shot = []
+        for ex in doc["few_shot"]:
+            assert isinstance(ex["user"], str) and ex["user"].strip()
+            for a in ex["assistant"]["aspects"]:
+                assert a["polarity"] in VALID_POL, f"bad polarity {a}"
+                assert a["facet"].strip()
+            few_shot.append((ex["user"], ex["assistant"]))
+        # contamination check: no 8-word shingle from an example inside any dev review
+        dev_texts = [json.loads(l)["text"].lower() for l in open(GOLD_DIR / "gold_dev.jsonl")]
+        for ex_text, _ in few_shot:
+            words = ex_text.lower().split()
+            for i in range(max(0, len(words) - 7)):
+                shingle = " ".join(words[i:i + 8])
+                if any(shingle in t for t in dev_texts):
+                    raise SystemExit(f"CONTAMINATION: example shares 8-gram with a dev review: '{shingle}'")
+        save_prompt(Prompt(
+            version=args.version, system=doc["system"], few_shot=tuple(few_shot),
+            meta={"parent": args.parent, "created": date.today().isoformat(),
+                  "status": "candidate", "model": args.model,
+                  "experiment": "honest-loop",
+                  "reflector": "sonnet subagent, template_v1",
+                  "notes": doc["rationale"],
+                  "change_summary": doc["change_summary"]},
+        ))
+        print(f"saved {args.version} ({len(few_shot)} few-shot)")
+        print("changes:", doc["change_summary"])
+        return
+    if args.cmd == "request":
+        from collections import Counter
+
+        from emmr.reviews.prompts import load_prompt as _lp, prompt_path
+
+        fp, fn = Counter(), Counter()
+        agg = None
+        for line in state_path.read_text().splitlines():
+            rec = json.loads(line)
+            if rec["tag"] == args.tag:
+                agg = rec["metrics"]
+        for line in (GEPA_DIR / "evals" / f"{args.tag}.jsonl").read_text().splitlines():
+            e = json.loads(line)
+            fp.update(e["fp_facets"])
+            fn.update(e["fn_facets"])
+        model_name = None
+        lineage = []
+        for line in state_path.read_text().splitlines():
+            rec = json.loads(line)
+            if rec["tag"] == args.tag:
+                model_name = rec.get("model")
+        import re as _re
+
+        loop_prefix = args.loop_prefix or (
+            _re.match(r"[a-z]+", args.prompt).group(0) if _re.match(r"[a-z]+\d", args.prompt) else None
+        )
+        if loop_prefix == "v":
+            raise SystemExit("refusing prefix 'v' (would leak the pre-protocol v3..v12 lineage); pass --loop-prefix")
+        for line in state_path.read_text().splitlines():
+            rec = json.loads(line)
+            pv = rec.get("prompt", rec["tag"])
+            in_loop = pv == "v2" or (loop_prefix and _re.fullmatch(rf"{loop_prefix}\d+", pv))
+            if rec.get("model") == model_name and model_name is not None and in_loop:
+                try:
+                    meta = _lp(pv).meta
+                except Exception:
+                    meta = {}
+                lineage.append(
+                    f"- {rec.get('prompt', rec['tag'])} (parent {rec.get('parent')}): "
+                    f"F1 {rec['metrics']['facet_f1']:.4f} -- "
+                    f"{meta.get('change_summary', meta.get('notes', ''))[:300]}"
+                )
+        parts = [
+            (config.PROMPTS / "reflection" / "template_v1.md").read_text(),
+            "\n\n## THE CURRENT CANDIDATE PROMPT\n\n```yaml",
+            prompt_path(args.prompt).read_text(),
+            "```\n\n## LINEAGE HISTORY (this model's loop: every candidate tried, its edit, its score)\n",
+            "\n".join(lineage) or "(first round)",
+            "\nDo not re-propose edits that already failed; build on what improved the score.",
+            "\n\n## MEASURED RESULTS\n",
+            f"Aggregate: {json.dumps(agg)}",
+            f"Top false-positive facet names: {fp.most_common(15)}",
+            f"Top missed gold facet names: {fn.most_common(15)}",
+            "\n## WORST-SCORING REVIEWS\n",
+            (GEPA_DIR / "reflection" / f"{args.tag}_packet.md").read_text(),
+        ]
+        Path(args.out).write_text("\n".join(parts))
+        print(f"wrote {args.out}")
+        return
     if args.cmd == "status":
         if not state_path.exists():
             print("no state")

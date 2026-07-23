@@ -362,6 +362,60 @@ for the scoped extraction experiment — matches the API reference at zero cash 
 both the 16 GB dev machine and an L4 under vLLM for any larger pass. Qwen3-14B is the
 recorded runner-up (statistically tied, −2 pp point estimate, same local speed). Test-350
 remains untouched; it will score the selected (model, prompt) pair once, via §5.3.
+*(Superseded by the §5.6 rerun, which replaced both the comparison and the selected
+prompt.)*
+
+### 5.6 Honest rerun — isolated reflector, symmetric loops (2026-07-22/23)
+
+§5.5's comparison had two asymmetries: the qwen3:8b curve came from a different
+reflection process (the in-session assistant, carrying cross-loop memory), and the other
+models' "iterations" were seeded with the v11 transfer prompt. This rerun removed both.
+**Protocol** (all three loops, identical): shared origin **v0** (= artifact v2, the
+initial hand-written prompt); 10 in-model rounds; each reflection performed by a **fresh
+Sonnet subagent** with no memory, driven by a **frozen template**
+(`prompts/reflection/template_v1.md`) plus only that loop's evidence: the current best
+candidate's full text, its per-review failure packet with annotator rationales, FP/FN
+counters, and the loop-local lineage history (each prior candidate, its edit, its
+score). Parent policy: always reflect on the best-so-far. Harness validation only
+(schema, polarity enum, an 8-gram contamination check against dev text). Requests and
+responses recorded verbatim under `data/interim/gepa/reflection/`; protocol amendments
+logged in `protocol_notes.md`. Two lineage-leakage incidents (old-loop candidates
+appearing in a request) were caught at request-assembly time and fixed before any
+contaminated reflection ran; the builder now rejects the unsafe prefix by construction.
+
+Curves: `reports/model_selection_f1.png` · per-round cost: `reports/model_selection_time.png`.
+
+| model | v0 | best (round) | in-model gain | paired Δ vs gemma best |
+|---|---|---|---|---|
+| **gemma4:12b** | 0.5442 | **0.6416** (gm10) | **+9.7 pp** | — |
+| qwen3:14b | 0.4801 | 0.5714 (qw9) | +9.1 pp | −7.2 [−11.1, −3.4] |
+| qwen3:8b | 0.4685 | 0.5165 (qe9) | +4.8 pp | −11.5 [−16.1, −7.0] |
+| llama3.1:8b | 0.4309 | screened out | — | — |
+| Haiku 4.5 + v11 (reference) | — | 0.5767 | — | −7.2 [−12.4, −2.2] |
+
+Findings:
+
+1. **The ranking survives the honest protocol and the gaps are now significant** —
+   gemma4:12b beats every alternative with CIs clear of zero, *including the Haiku 4.5
+   reference* (caveat: Haiku ran the non-optimized v11 prompt and got no loop of its
+   own; the fair claim is "optimized local Gemma ≥ unoptimized API Haiku").
+2. **In-model optimization is real under the isolated reflector** — +9 to +10 pp for
+   the two larger models, dwarfing the ±2 pp noise-band gains of the original
+   in-session round 1. All three loops share the same shape: large gains in rounds 1–3
+   (vocabulary alignment with the gold taxonomy), then a plateau where most children of
+   the best regress.
+3. **Reflector ablation** (same model, same budget, same origin — qwen3:8b): isolated
+   0.5165 vs in-session 0.4895, paired **+4.3 pp [−0.4, +9.1]** — favors the isolated
+   protocol at borderline significance. Plausible mechanism: the frozen template forces
+   packet-grounded edits and the lineage table suppresses re-litigating failed levers.
+4. **Model capacity gates what prompting can extract**: identical evidence and reflector
+   yielded +9.7 pp on a 12B and +4.8 pp on an 8B. Prompt optimization amplifies, rather
+   than compensates for, model quality on this task.
+
+**Final selection: gemma4:12b + prompt gm10** (`EXTRACTION_MODEL`,
+`EXTRACTION_PROMPT_VERSION`). Dev 0.6416 / P 0.647 / R 0.636 / polarity 0.943. The dev
+number is a maximum over many selection events (winner's curse); the reportable figure
+comes from the single §5.3 finalize on test-350, still untouched.
 
 ---
 

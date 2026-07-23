@@ -1,0 +1,207 @@
+parent: gm3
+created: '2026-07-22'
+status: candidate
+model: gemma4:12b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The lineage is the dominant piece of evidence this round. gm3 (F1 0.6384) is the best candidate
+  in the whole run. Its two children, gm4 (F1 0.6060) and gm5 (F1 0.5837), both regressed well below it
+  -- and, reading their full diffs, both made the same large bundle of simultaneous changes: they rewrote
+  the material/build-quality/softness boundary again, restructured the specific-over-generic rule with
+  new carve-outs, pulled ''appearance'' out of the six/seven-term avoidance set, added an ''organization''
+  vs ''functionality'' split, promoted the performance ban to its own sentence, and (gm4 only) split ''fit''
+  from ''sizing accuracy'' and added a neutral-polarity rule -- five to seven simultaneous edits each,
+  on top of gm3''s already-substantial round. Both bundles moved the score in the wrong direction. Because
+  every one of those edits was bundled together twice, there is no way to tell from the score alone which
+  specific edit helped and which one(s) actively hurt -- it could be that the material rewrite (attempted
+  differently each time, on the single most stubborn error mass in the whole run) is the poison pill,
+  or the neutral-polarity rule, or simply that gemma4:12b''s instruction-following degrades as the rule
+  list grows past a certain density, independent of any single edit''s individual merit. Re-attempting
+  a third large bundle risks a third uninterpretable regression. Given the explicit instruction not to
+  re-propose edits that already failed and to build on what improved the score, the disciplined move this
+  round is to stop bundling and isolate a single variable: take gm3''s system prompt and few-shot set
+  exactly as they are (the best-scoring point in the lineage) and make exactly ONE small, well-evidenced
+  addition that neither gm4 nor gm5 tried in isolation -- both only ever tried it wrapped inside their
+  larger, failed bundles. That addition is a formal definition for ''effectiveness''. It is one of the
+  seven broad terms named explicitly in gm3''s own ''prefer specific over generic'' sentence, yet it is
+  the only one of the seven with no distinction bullet anywhere in the prompt -- a genuine gap, not a
+  judgment call. In gm3''s own worst-scoring reviews this gap is directly visible: the angel-hair-pasta
+  review (''Angelhair, not spaghetti is the only criticism I have'') is gold ''effectiveness: negative''
+  (the product failed to deliver the promised type) but gm3 predicted ''size: negative''; the pitbull-muzzle
+  review (''now that he is bigger... it slows him down'') is gold ''effectiveness: positive'' but gm3
+  predicted ''fit: negative''. Effectiveness is also the second-largest missed-gold-facet mass in the
+  aggregate table (FN=7, behind only appearance''s FN=9). Rather than also touching appearance, organization,
+  material, performance-sentence structure, or fit/sizing-accuracy this round -- all directions gm4 and
+  gm5 already tested in combination and which coincided with regressions -- gm6 leaves every one of those
+  untouched, exactly as gm3 wrote them, so that if this round''s score moves, the effectiveness-definition
+  edit is the only candidate explanation, and if it still regresses, that specific edit itself (not just
+  ''bundling'') can be ruled out for gm7 with confidence. The single few-shot change (within the 2-example
+  budget, using only 1 of the 2 available) adds one new synthetic review -- an enzyme stain-spray review
+  -- that gives a clean, contrasting-polarity demonstration of ''effectiveness'' (the stain is actually
+  gone, an outcome-in-the-world) versus ''functionality'' (the nozzle mechanism itself is fiddly), written
+  fresh without copying any development-set review. No other example was added, changed, or removed, and
+  no other system rule was touched, to keep this round a true single-variable test after two consecutive
+  multi-edit regressions.'
+change_summary: 'Added exactly one new rule: a formal ''effectiveness'' definition as the first item in
+  the seven-broad-terms distinctions list (''whether the product achieves the real-world result or outcome
+  it is meant to produce ... as opposed to functionality, which is about whether the product''s own mechanism
+  operates'') -- targets effectiveness''s FN=7 (second-largest missed-facet mass in the aggregate table)
+  and is directly evidenced by two worst-scoring reviews where gm3 substituted an unrelated concrete noun
+  (''size'', ''fit'') for the missing ''effectiveness'' judgment.
+
+
+  Deliberately left every other rule untouched from gm3, including the material/build-quality/softness
+  boundary, the appearance/color/design distinctions, the performance ban wording, and the fit/sizing-accuracy
+  split -- gm4 and gm5 both already modified all of these simultaneously in large bundles and both scored
+  below gm3 (0.6060 and 0.5837 vs 0.6384), so re-touching them again this round without isolating variables
+  would repeat the same uninterpretable-bundle mistake twice in a row.
+
+
+  Added one new synthetic few-shot example (enzyme stain spray) demonstrating ''effectiveness'' (stain
+  actually lifted, an outcome judgment) and ''functionality'' (the nozzle mechanism itself, negative)
+  as two distinct, oppositely-polarized facets in the same review, without copying any development-set
+  text. Left all 7 of gm3''s existing examples completely unchanged, and did not use the second available
+  example-change slot, to keep this round''s few-shot set changed by exactly one variable as well.'
+version: gm6
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION or discrete COMPONENT of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'camera', 'speaker'. If several components share one complaint (e.g. multiple panels that all fit badly), name the shared dimension once ('fitment', 'build quality') rather than each part; name a specific component only when its opinion is genuinely distinct from the rest.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+  - Prefer the most specific concrete facet the review actually supports over a broad outcome or category term. This applies to ALL SEVEN of 'effectiveness', 'functionality', 'reliability', 'durability', 'build quality', 'material', and 'appearance': reach for one of these seven only when the review gives no more specific mechanism, feature, or quality to name -- if it names one (suction, stability, sturdiness, portability, strength, softness, mess control, organization, mounting design, ease of attachment, dispensing, storage capacity, power, battery life, software, versatility, brewing quality, and so on), use that specific term instead. Never use 'performance' as a facet: always name the specific thing that performed well or badly (power, speed, brewing quality, accuracy, ...).
+  - Among those seven broad terms, when more than one could plausibly apply, use these distinctions:
+    - 'effectiveness': whether the product achieves the real-world result or outcome it is meant to produce (relief from a problem, a promised effect or spec actually being delivered, a device doing what it was bought to do to something outside itself) -- as opposed to 'functionality' below, which is about whether the product's own mechanism operates, not the outcome it produces.
+    - 'functionality': the product's features or mechanisms operate as designed, including plain "it works" / "no problems" statements with no further detail given.
+    - 'reliability': the product (or one of several like units) stops working, malfunctions, glitches, or behaves inconsistently -- across repeated use or after a period of time -- even if that happens later rather than immediately. A device that fails outright after months of use is a reliability judgment, not a durability one.
+    - 'durability': the product's physical materials or components gradually wear, fade, weaken, or degrade over extended time or repeated use -- a condition/degradation judgment, not a stop-working judgment -- and never immediate/out-of-box defects.
+    - 'build quality': how well the product is assembled or constructed -- workmanship, structural integrity, parts fitting together, or defects, including out-of-box defects -- and also any bare, undetailed statement of overall "quality" ('great quality', 'the quality is amazing') that does not itself describe the substance or fabric.
+    - 'material': the substance or fabric itself, judged on its own feel, texture, or composition ('great material', 'feels like cheap plastic', 'soft fabric') -- only when the review actually describes that substance; a generic quality compliment with no substance description is 'build quality', not 'material'.
+  - When a review makes many small observations that all serve one underlying theme (a long testimonial on whether a workout, tool, or treatment worked as intended) AND names no other distinct concrete dimension, extract ONE facet for that theme using the definitions above instead of several fine-grained ones that fragment it. Do not apply this consolidation to a short review that already names 1-3 distinct concrete dimensions -- extract those directly instead.
+  - 'effectiveness', 'durability', 'build quality', and 'material' describe physical products or products applied to the body, and never apply to creative or informational works (books, movies, shows, music, articles). For those, use dimensions such as 'plot', 'characters', 'writing quality', 'pacing', 'humor', 'engagement', 'emotional impact', or 'entertainment value' instead.
+  - Preferred terms for near-synonyms (matching is by semantic similarity, so use the left term, not the one on the right): 'appearance' for a general visual impression, finish, print, or overall look that is not framed as a design choice and not specifically about color; 'color' for a comment specifically about the product's hue or color, whether the reviewer simply likes or dislikes it or is comparing it to photos/expectations; 'design' for the product's overall styling, shape, or aesthetic/ergonomic design as a considered choice ('beautiful design', 'sleek design', 'well-designed'); 'size' for a non-wearable object's physical dimensions being too big or small for its purpose; 'sizing accuracy' only for how a wearable item runs relative to its labeled or expected size; 'included accessories' for extra items, tools, or parts bundled with the product.
+  - If none of the terms above fit, name the dimension using the review's own vocabulary (e.g. 'installation', 'fit', 'condition', 'style', 'thickness', 'scratch resistance', 'ease of cleaning', 'sturdiness', 'portability', 'strength', 'softness', 'mess control', 'organization', 'mounting design', 'ease of attachment', 'dispensing', 'ingredient safety', 'educational value', 'scent', 'storage capacity') rather than forcing it into one of the broad terms above.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    I bought this vibrating foam roller for my chronic calf tightness, and it's honestly done more for me in a month than years of stretching ever did — I can finally touch my toes again. It also looks sleek on my shelf and came with a mesh carrying bag, which was a nice bonus. Six months of near-daily use later it still holds its charge and works like day one, though the power button felt a little wobbly right out of the box.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: done more for me in a month than years of stretching ever did
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on my shelf
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a mesh carrying bag
+    - facet: durability
+      polarity: positive
+      evidence: Six months of near-daily use later it still holds its charge and works like day one
+    - facet: build quality
+      polarity: negative
+      evidence: the power button felt a little wobbly right out of the box
+- user: |-
+    This webcam's autofocus locks on fast and the video looks crisp even in dim light. The clip has a sleek, minimalist design that matches my monitor, and the aluminum body feels solid in the hand. My only complaint is the app crashes about once a week and I have to unplug and replug the camera to get the feed back.
+  assistant:
+    aspects:
+    - facet: autofocus
+      polarity: positive
+      evidence: autofocus locks on fast
+    - facet: image quality
+      polarity: positive
+      evidence: the video looks crisp even in dim light
+    - facet: design
+      polarity: positive
+      evidence: sleek, minimalist design that matches my monitor
+    - facet: build quality
+      polarity: positive
+      evidence: the aluminum body feels solid in the hand
+    - facet: reliability
+      polarity: negative
+      evidence: the app crashes about once a week and I have to unplug and replug the camera to get the
+        feed back
+- user: |-
+    This collapsible camping stool holds firm even when I lean back on uneven, rocky ground, and it folds down small enough to clip onto the outside of my pack for the hike in. After an entire summer of weekly trips the fabric seat still looks brand new, no fraying or fading anywhere. The one hiccup is the folding latch: about half the time it doesn't catch on the first try, so I have to fold and unfold it again to get it to lock.
+  assistant:
+    aspects:
+    - facet: sturdiness
+      polarity: positive
+      evidence: holds firm even when I lean back on uneven, rocky ground
+    - facet: portability
+      polarity: positive
+      evidence: folds down small enough to clip onto the outside of my pack
+    - facet: durability
+      polarity: positive
+      evidence: After an entire summer of weekly trips the fabric seat still looks brand new, no fraying
+        or fading anywhere
+    - facet: reliability
+      polarity: negative
+      evidence: about half the time it doesn't catch on the first try
+- user: |-
+    This remote-control car was a hit with my nephew. The controller buttons respond the instant you press them, with no lag, and it holds a straight line even taking corners at full speed. The plastic shell on the car itself flexed alarmingly the first time it flipped over in a crash, though nothing actually cracked. One of the four AA batteries included in the box was dead on arrival.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: controller buttons respond the instant you press them, with no lag
+    - facet: build quality
+      polarity: negative
+      evidence: plastic shell on the car itself flexed alarmingly the first time it flipped over in a
+        crash
+    - facet: included accessories
+      polarity: negative
+      evidence: One of the four AA batteries included in the box was dead on arrival
+- user: |-
+    I bought this enzyme stain spray for my toddler's grass-stained jeans, and after soaking overnight the stain is completely gone, even ones I'd already run through the wash once and given up on. The trigger nozzle needs a firm double-pump before it starts misting evenly, which is a little annoying every time I use it.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: after soaking overnight the stain is completely gone, even ones I'd already run through
+        the wash once and given up on
+    - facet: functionality
+      polarity: negative
+      evidence: The trigger nozzle needs a firm double-pump before it starts misting evenly

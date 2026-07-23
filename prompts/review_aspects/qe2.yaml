@@ -1,0 +1,146 @@
+parent: v2
+created: '2026-07-22'
+status: candidate
+model: qwen3:8b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The two largest error masses in the v2 evidence are missed gold facets, not invented ones: ''appearance''
+  (21 misses) and ''build quality'' (20 misses) dwarf every other category, and neither concept appears
+  anywhere in v2''s system rules or few-shot examples -- the model has no template for them at all, which
+  explains the near-total misses even on reviews with clearly stated positive/negative visual or construction
+  commentary (e.g. B096NCTTV5#3, B07Y5WMGGG#12, B07BHKVZPX#8 for appearance; B000EOOQPW#11, B0757MNXVL#10,
+  B088H3P77R#7 for build quality). qe1 already tried to fix ''build quality'' with a prose ''usage cues''
+  rule and that regressed F1 (0.4685 -> 0.4523), so this round does not repeat a long verbal distinction
+  -- instead it adds one short cue line plus a concrete contrasting few-shot example (build quality feels-flimsy-now
+  vs. durability fails-over-weeks in the same review), since a worked example is a different lever than
+  more prose and directly shows the boundary the model needs. The FP side shows the same near-synonym
+  fragmentation pattern paired with those misses: ''durability'' (12 FP), ''material quality'' (10 FP)
+  and ''product durability'' (4 FP) are frequently the model''s mis-named guess for what gold calls ''build
+  quality'' (see B000EOOQPW#11: gold ''build quality'', pred ''product durability''/''plastic quality'';
+  B0757MNXVL#10 and B07FYK2FJY#12: gold ''build quality'', pred ''material quality''). Because matching
+  is embedding cosine at 0.80, this vocabulary drift is scored as both a false positive and a false negative
+  on every occurrence, so tightening the canonical name is a double-count win. A second, smaller cluster
+  is ''size'' (9 misses) vs. ''sizing accuracy''/''fit'' (7 FP each): B07FYK2FJY#12 shows gold ''size''
+  matched against pred ''sizing accuracy'' -- the two concepts (is the product itself big/small enough,
+  vs. does the ordered size run true) were never disambiguated in v2, so the rule text now separates them
+  explicitly and the new second example demonstrates both facets in one review. ''included accessories''
+  (6 misses, e.g. B07WCRVJT9#1, B07Y5WMGGG#12) and ''effectiveness''/''functionality'' (9 misses each,
+  frequently mis-named as task-specific compounds like ''scalp massage effectiveness'' or ''cleaning efficiency''
+  in B08NHPQMY5#6 and B079NTYJG6#4) get one-line canonical-name rules plus coverage in the two new examples.
+  Finally, the FP cluster ''value for money'' (9) + ''price'' (6) + ''value for price'' (5) = 20 occurrences
+  shows the existing ''ignore ... the price paid'' rule is too weak -- B08NHPQMY5#6 and B088H3P77R#7 both
+  show gold explicitly omitting a money facet even when cost is discussed as a quality judgment (''not
+  worth of the money'', ''reasonable price''), so the exclusion rule is reworded to name that exact phrasing
+  pattern, and the new electronics example mentions a price complaint (''pricier than I expected'') without
+  producing a price/value facet, modeling the intended behavior in-context rather than only stating it.
+  The media/book miss (B09431D2DX#3, fp=0 fn=3, plot/characters/writing quality) is real but a single
+  instance and would cost a full new example to fix properly; instead it gets one line extending the facet-dimension
+  rule to media types, which is enough signal without spending the two-example budget on a low-frequency
+  case. All four original few-shot examples are kept unchanged (they still cover negation, empty-list,
+  and non-English cases that are working); only two new synthetic examples are added, staying within the
+  two-example-change budget and roughly 1.7x the original prompt length.'
+change_summary: '1. Added ''appearance'' and ''build quality'' to the facet-dimension example list in
+  rule 1 (both were entirely absent from v2, and are the two largest miss categories: 21 and 20). 2. Reworded
+  the price/value exclusion rule to name the exact phrasing that leaks through (''worth it'', ''good value'',
+  ''reasonable price'', ''overpriced'', ''expensive'') -- targets 20 combined FPs across ''value for money''/''price''/''value
+  for price''. 3. Added a one-line rule making ''appearance'' explicit as a commonly-missed dimension
+  (visual look/style/color), distinct from packaging. 4. Added a one-line rule for ''included accessories''
+  (bundled items/parts) -- 6 misses, previously uncovered. 5. Added a canonical-naming rule collapsing
+  task-specific compounds into ''effectiveness'' and ''functionality'', and separating ''size'' (product''s
+  own dimensions adequate) from ''sizing accuracy''/''fit'' (does the ordered size run true) -- targets
+  9 ''functionality''/''effectiveness'' misses and the ''size'' vs ''sizing accuracy''/''fit'' (9 miss
+  / 7+7 FP) naming split. Kept to one short line plus a worked example, not a long prose distinction,
+  since qe1''s longer ''usage cues'' rule for build-quality/durability regressed score. 6. Added a one-line
+  rule extending facets to media/creative products (plot, characters, writing quality) -- addresses the
+  single all-miss book review without spending example budget on it. 7. Added new few-shot example 5 (blender):
+  demonstrates appearance, included accessories, build quality (feels flimsy now) contrasted with durability
+  (fails after weeks) in the same review, and effectiveness. 8. Added new few-shot example 6 (tablet/stand):
+  demonstrates size vs. fit, functionality, and implicitly models the price-exclusion rule by mentioning
+  a price complaint that produces no price/value facet. Original 4 examples unchanged.'
+version: qe2
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'appearance', 'build quality'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and customer service -- they are not aspects of the product. Also ignore money: 'worth it', 'good value', 'reasonable price', 'overpriced', 'expensive' describe cost, not the product -- never create a 'value for money' or 'price' facet, even when cost is framed as a quality judgment.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - How the product looks (color, style, aesthetics) is 'appearance' -- a common dimension that is easy to miss when the review is mostly praise ("looks great", "love the look").
+  - Items or parts bundled with the product are 'included accessories'.
+  - Prefer generic canonical names over task-specific compounds so near-synonyms don't fragment: 'effectiveness' (not 'cleaning power', 'scalp massage effectiveness'), 'functionality' for whether promised features work at all, 'size' for whether the product's own dimensions/capacity are adequate (not 'sizing accuracy', which is reserved for whether the ordered size runs true to expectation), 'build quality' for how solid or well-assembled the product feels right now (see example below for how this differs from 'durability', which is specifically about holding up over time).
+  - Facets apply to any product type, including media (books, movies, games): 'plot', 'characters', 'writing quality' are valid facets under the same schema.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender looks sleek on the counter and matches the rest of my kitchen. It came with three different-sized jars and a recipe booklet, which was a nice bonus. The plastic base feels flimsy and rattles a bit at high speed, and after about six weeks of daily use one of the gears started grinding and it eventually stopped turning on. When it did work, it pureed frozen fruit smoothly every time.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter
+    - facet: included accessories
+      polarity: positive
+      evidence: came with three different-sized jars and a recipe booklet
+    - facet: build quality
+      polarity: negative
+      evidence: plastic base feels flimsy and rattles a bit at high speed
+    - facet: durability
+      polarity: negative
+      evidence: after about six weeks of daily use one of the gears started grinding and it eventually
+        stopped turning on
+    - facet: effectiveness
+      polarity: positive
+      evidence: pureed frozen fruit smoothly every time
+- user: |-
+    The screen is honestly a bit too small for comfortable reading, though the included stand fits it perfectly and holds it at a nice angle. It was pricier than I expected, but every feature promised in the listing actually works as advertised.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: a bit too small for comfortable reading
+    - facet: fit
+      polarity: positive
+      evidence: the included stand fits it perfectly and holds it at a nice angle
+    - facet: functionality
+      polarity: positive
+      evidence: every feature promised in the listing actually works as advertised

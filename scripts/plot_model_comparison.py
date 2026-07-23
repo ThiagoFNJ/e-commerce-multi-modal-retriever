@@ -31,13 +31,23 @@ SERIES = {
 HAIKU_F1 = 0.5767
 
 records = [json.loads(l) for l in (Path(config.INTERIM) / "gepa" / "state.jsonl").read_text().splitlines()]
-series: dict[str, list] = {m: [] for m in SERIES}
-for r in records:
-    if r["tag"] == "haiku45-v11":
-        continue
-    model = r.get("model") or "qwen3:8b"
-    if model in series:
-        series[model].append((r["tag"], r["metrics"]["facet_f1"]))
+by_tag = {r["tag"]: r["metrics"]["facet_f1"] for r in records}
+
+def rounds(prefix: str) -> list:
+    import re
+    tags = sorted((int(re.match(rf"{prefix}(\d+)-", t).group(1)), t)
+                  for t in by_tag if re.match(rf"{prefix}\d+-", t))
+    return [(t, by_tag[t]) for _, t in tags]
+
+# honest-protocol series: shared v2 origin + each model's isolated-reflector rounds only.
+# (v11 transfer points, the pre-protocol g/q rounds, and qwen3:8b's original in-session
+# loop are excluded — the latter lives in gepa_f1_curve.png as a reflector ablation.)
+series = {
+    "qwen3:8b": [("v2", by_tag["v2"])] + rounds("qe"),
+    "gemma4:12b": [("v2-gemma4", by_tag["v2-gemma4"])] + rounds("gm"),
+    "qwen3:14b": [("v2-qwen14", by_tag["v2-qwen14"])] + rounds("qw"),
+    "llama3.1:8b": [("v2-llama31", by_tag["v2-llama31"])],
+}
 
 fig, ax = plt.subplots(figsize=(8.5, 5), dpi=200)
 fig.patch.set_facecolor(SURFACE)
@@ -58,7 +68,9 @@ ax.axhline(HAIKU_F1, color=INK_2, linewidth=1, linestyle=(0, (4, 4)), alpha=0.5,
 ax.annotate(f"Haiku 4.5 (API reference, v11)  {HAIKU_F1:.3f}", (0, HAIKU_F1),
             xytext=(0, 6), textcoords="offset points", fontsize=8.5, color=INK_2)
 
-ax.set_xlabel("prompt iteration within each model's sequence", fontsize=10, color=INK)
+ax.set_xlabel("in-model GEPA iteration (0 = initial prompt v0)", fontsize=10, color=INK)
+fig.text(0.01, 0.005, "all rounds: isolated reflector (sonnet subagent, template v1), "
+         "shared v0 origin, best-so-far parent policy", fontsize=7.5, color=INK_2)
 ax.set_ylabel("facet F1 (dev-248, semantic θ=0.80)", fontsize=10, color=INK)
 ax.set_title("Extractor model selection — same gold set, per-model GEPA reflections",
              fontsize=11.5, color=INK, pad=12, loc="left")

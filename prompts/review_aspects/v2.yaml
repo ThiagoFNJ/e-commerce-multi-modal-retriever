@@ -1,4 +1,5 @@
 version: v2
+alias: v0  # the initial prompt; figures label it v0
 parent: null
 created: '2026-07-18'
 status: baseline

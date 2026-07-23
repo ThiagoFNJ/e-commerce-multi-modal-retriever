@@ -1,0 +1,116 @@
+parent: v2
+created: '2026-07-22'
+status: candidate
+model: gemma4:12b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: The two largest, cleanly-diagnosable error masses are (1) a cluster of near-synonym naming mismatches
+  that the 0.80 semantic-match threshold treats as double penalties -- 'durability'(FP15)/'material quality'(FP14)/'build
+  quality'(FP8) against 'build quality'(FN20) show the model fragmenting construction/material complaints
+  into three different labels while gold consistently collapses them to 'build quality', and 'aesthetics'(FP6)
+  against 'appearance'(FN19) shows a simple vocabulary mismatch; and (2) a set of generic outcome facets
+  the model never produces at all -- 'effectiveness'(FN14), 'functionality'(FN11), 'reliability'(FN6),
+  'size'(FN9), 'included accessories'(FN7) -- several of which the worst-scoring reviews show should replace
+  long lists of hyper-specific invented facets (e.g. the workout-DVD and backpod reviews, where gold is
+  a single 'effectiveness' aspect but the model emits three to four fine-grained ones). A third, smaller
+  but recurring pattern is itemizing individual components (front fender, number plate, rear fender, side
+  plates) where gold names the one dimension they all share ('fitment'/'build quality'). All three patterns
+  are addressed with explicit, low-cost system rules (definitions and preferred terms), since these are
+  lookup/labeling fixes rather than reasoning failures. I also rewrote the one existing few-shot example
+  that was actively teaching the over-used term ('material quality') and added a single new synthetic
+  example dense enough to demonstrate five of the newly clarified terms (effectiveness, appearance, included
+  accessories, durability, build quality) at once, staying within the 2-example-change budget without
+  copying any development review.
+change_summary: 'Added a component-vs-shared-dimension rule so multiple parts with one common complaint
+  are named once (''fitment''/''build quality'') instead of itemized, targeting the front-fender/number-plate/side-plates
+  false positives against the missed ''fitment''/''build quality'' gold labels.
+
+  Added a consolidation rule plus definitions for ''effectiveness'' (does it work as intended), ''functionality''
+  (do its mechanisms operate as designed), and ''reliability'' (is it consistent across repeated use),
+  targeting the three largest missed-facet masses (14, 11, 6) and the over-fragmentation seen on long
+  testimonial reviews (workout DVD, backpod).
+
+  Added a preferred-vocabulary rule: ''appearance'' over ''aesthetics''/''looks'' (FN19 vs FP6); ''build
+  quality'' over ''material quality''/''workmanship'' for construction, assembly, and materials issues
+  including out-of-box defects (FN20 vs FP14+FP8); ''durability'' restricted strictly to wear/longevity-over-time
+  claims, never immediate defects (FP15); ''size'' (physical dimension, non-wearable) split from ''sizing
+  accuracy'' (wearable, relative to labeled size) (FN9 vs FP3); ''included accessories'' named explicitly
+  for bundled extras (FN7).
+
+  Rewrote the Spanish few-shot example''s facet from ''material quality'' to ''build quality'' (same evidence/polarity)
+  so the example stops reinforcing the over-used term.
+
+  Added one new synthetic few-shot example (foam roller review) demonstrating effectiveness, appearance,
+  included accessories, durability, and build quality together in one multi-aspect review, without copying
+  any development-set text.'
+version: gm1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION or discrete COMPONENT of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'camera', 'speaker'. If several components share one complaint (e.g. multiple panels that all fit badly), name the shared dimension once ('fitment', 'build quality') rather than each part; name a specific component only when its opinion is genuinely distinct from the rest.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+  - When a review makes many small observations that all serve one underlying theme (a long testimonial on whether a workout, tool, or treatment worked), extract ONE facet for that theme instead of several fine-grained ones that fragment it. Use 'effectiveness' for "does it work as intended / produce the desired result"; 'functionality' for "do its features or mechanisms operate as designed"; 'reliability' for "is it consistent, or does it fail/glitch across repeated use".
+  - Preferred terms for near-synonyms (matching is by semantic similarity, so use the left term, not the one on the right): 'appearance' not 'aesthetics'/'looks'; 'build quality' not 'material quality'/'workmanship' for construction, assembly, or materials that fail or feel cheap, including defects present right out of the box; 'durability' only for wear or longevity claims over extended time or repeated use, never for immediate/out-of-box defects; 'size' for a non-wearable object's physical dimensions being too big or small for its purpose; 'sizing accuracy' only for how a wearable item runs relative to its labeled or expected size; 'included accessories' for extra items, tools, or parts bundled with the product.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: build quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    I bought this vibrating foam roller for my chronic calf tightness, and it's honestly done more for me in a month than years of stretching ever did — I can finally touch my toes again. It also looks sleek on my shelf and came with a mesh carrying bag, which was a nice bonus. Six months of near-daily use later it still holds its charge and works like day one, though the power button felt a little wobbly right out of the box.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: done more for me in a month than years of stretching ever did
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on my shelf
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a mesh carrying bag
+    - facet: durability
+      polarity: positive
+      evidence: Six months of near-daily use later it still holds its charge and works like day one
+    - facet: build quality
+      polarity: negative
+      evidence: the power button felt a little wobbly right out of the box

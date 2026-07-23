@@ -1,0 +1,193 @@
+parent: qw3
+created: '2026-07-22'
+status: candidate
+model: qwen3:14b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'This round''s evidence is a re-measurement of qw3 itself, and the lineage shows four separate
+  children of qw3 (qw4, qw5, qw6, qw7) all tried to fix the two largest FP masses -- ''value'' (FP=30)
+  and ''functionality'' (FP=15) -- by rewriting or narrowing their disambiguation text, and all four scored
+  below qw3 (0.5506, 0.5525, 0.5606, 0.5622 vs qw3''s 0.5696). Two of the worst-review items this round
+  are in fact the *same* cases qw3''s own notes cite as motivating evidence (the paper-cup ''dispensing''
+  vs ''functionality'' review, and the ''Extremely helpful in organizing'' review, which is the mirror-image
+  failure -- gold wants generic ''functionality'' but the model over-specified to ''organization''). That
+  qw3''s fix didn''t resolve either case, combined with four independent failed attempts to push further
+  in that direction, is strong evidence that additional value/functionality prose changes are a saturated,
+  net-negative lever for this loop; qw8 deliberately leaves both bullets untouched and looks for error
+  mass elsewhere. Two clear, previously-untried patterns stand out instead, both being cases where a rule
+  that ALREADY EXISTS in the qw3 system prompt is demonstrably not being followed, rather than a naming
+  ambiguity needing new disambiguation text: (1) the listing/description-accuracy exclusion -- review
+  B007D53QRE#9 (f1=0.0, explicit annotator rationale ''listing accuracy is not a feature of the product'')
+  shows the model outputting a ''product description accuracy'' facet despite the exclusion already being
+  written into the prompt; the rule is stated but has no worked example, and prose-only exclusions are
+  evidently not reliable. (2) the comparison/wrong-subject exclusion -- review B01GHVIU70#3 (f1=0.0, the
+  camera-vs-Panasonic review) shows the model extracting five facets (''image quality'', ''lens size'',
+  ''zoom capability'', ''screen flexibility'', ''aperture'') that are ALL specs of the alternative Panasonic
+  camera, not the product reviewed, even though qw3 already added a rule for exactly this case last round
+  -- again a prose rule with no demonstration. A related, same-shaped failure appears in B085Z3F5S3#5
+  (''Hideous yellow bathroom so at least the towels look good'' -> gold ''appearance: positive'', pred
+  ''color: negative''): the model attributed the bathroom''s color to the product. This is the same ''wrong
+  subject'' failure as the camera case (describing something that isn''t the product itself), so the comparison
+  rule is broadened to cover both instead of adding a second, separate rule. Both fixes get a concrete
+  synthetic few-shot example this round, since the evidence shows text-only exclusions in this prompt
+  are not sufficing on their own -- this is the two-example budget for this round. A third, low-risk and
+  cheaply-grounded addition: ''content quality'' is added to the generic-name-preference list (content
+  quality FN=4 aggregate; worst review 0375710825#10, gold ''content quality: positive'', pred split into
+  ''educational value: positive'' + ''relevance: negative'', a fragmentation error for exactly the kind
+  of holistic content judgment the generic-name list already exists to catch for other domains). This
+  does not touch value or functionality and is a one-line, additive, previously-untried change. Other
+  single-instance naming mismatches in the worst-review list (e.g. ''sturdiness'' vs ''build quality'',
+  ''color payoff'' vs ''color'', ''leak protection'' vs ''leakage'', ''finish quality'' vs ''appearance'')
+  are each isolated occurrences without aggregate-level support and are not acted on this round, consistent
+  with the instruction to target the largest error masses rather than every hypothetical mismatch.'
+change_summary: '1) Strengthened the listing/description-accuracy exclusion (already present in qw3) to
+  explicitly forbid facets like ''description accuracy'', ''listing accuracy'', or ''product description'',
+  and to spell out the fallback: name the real underlying quality if one is named once the mismatch is
+  set aside, otherwise omit the aspect entirely. Targets B007D53QRE#9 (f1=0.0, annotator rationale explicitly
+  ''listing accuracy is not a feature of the product''), where the existing prose-only rule failed to
+  prevent a ''product description accuracy'' facet. 2) Broadened the comparison-to-alternative-product
+  exclusion (added by qw3 last round) into a general ''wrong subject'' exclusion: also covers descriptions
+  of the surrounding environment or a different nearby object, not just a named alternative product. Targets
+  B01GHVIU70#3 (f1=0.0, camera review -- the existing rule from qw3 still didn''t stop 5 Panasonic-alternative
+  specs from being extracted) and unifies it with the same-shaped failure in B085Z3F5S3#5 (''hideous yellow
+  bathroom'' color wrongly attributed to the towels being reviewed). 3) Added ''content quality'' to the
+  generic-name-preference list. Targets content quality''s FN=4 aggregate and the worst-review fragmentation
+  in 0375710825#10 (gold ''content quality: positive'', pred split into ''educational value'' + a spurious
+  ''relevance: negative''). 4) Added one new synthetic few-shot example (shelf-bracket review) demonstrating
+  the strengthened listing-accuracy exclusion: extracts ''installation'' (the real complaint once the
+  listing mismatch is set aside) and ''build quality'', while silently omitting any description-accuracy
+  facet. 5) Added one new synthetic few-shot example (blender review) demonstrating the broadened wrong-subject
+  exclusion: extracts ''ice crushing'' and ''ease of cleaning'' for the product reviewed, while silently
+  omitting the NutriBlend alternative''s pitcher size and motor wattage. 6) Deliberately left the ''value''
+  and ''functionality'' bullets, and all few-shot examples demonstrating them, untouched -- four separate
+  qw3-children (qw4, qw5, qw6, qw7) already tried narrowing/rewriting these and all scored below qw3,
+  so further churn there this round would be re-litigating a demonstrably net-negative lever rather than
+  grounding an edit in new evidence.'
+version: qw8
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'battery life', 'appearance'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'the case doesn't flex when squeezed' -> facet 'build quality', polarity 'positive'.
+  - Product-intrinsic only: ignore delivery, shipping (including shipping speed and how fast it arrived), the condition of the packaging or box itself (as opposed to the product), the seller, and customer service / support interactions -- they are not aspects of the product. The raw price paid is not a facet, but 'value' -- whether the product's quality or features justify its price, a worth-it-or-not judgment -- is a legitimate, distinct facet. Ignore whether the listing, description, or photos accurately represented the product (a listing-accuracy complaint is not a product aspect) -- never output a facet like 'description accuracy', 'listing accuracy', or 'product description'; if a specific quality is being praised or criticized once the mismatch itself is set aside, name that quality instead (e.g. 'ordered a peel-and-stick item but it needed screws' -> 'installation', not a description-accuracy facet); if no specific quality is named, omit the aspect entirely. Ignore a single defective or damaged-on-arrival unit that was promptly replaced or resolved and is not described as an ongoing or general flaw -- that is a one-off fulfillment incident, not a product-quality aspect, even when paired with customer-service praise. If the review's description is about something other than the product being reviewed -- specs or opinions attributed to a different, alternative product mentioned for comparison, or a description of the surrounding environment or a different nearby object (e.g. the color of a room a home-decor item sits in) -- do not extract it as a facet of the product itself; only extract facets that describe the product actually being reviewed.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names. Never prefix a facet with the product, its category, or a component name either -- write the bare dimension: 'durability' not 'charger durability', 'video transfer' not 'dvd transfer quality', 'compatibility' not 'charger compatibility'.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Facet naming: use the simplest, most generic dimension name that fits -- near-synonyms are scored as mismatches against the gold vocabulary. Choose carefully among these frequently-confused neighbors:
+    - 'sizing accuracy' (not 'size') is for whether the item's labeled/ordered size runs true -- 'runs small', 'order a size up', 'true to size'.
+    - 'size' is for the product's own literal dimensions or magnitude when no true-to-size judgment is being made -- 'cup size', 'fits my small apartment'.
+    - 'fit' is for how snugly or comfortably the product fits a body or space once in use, not a true-to-size claim.
+    - 'assembly' is for putting a multi-part product together from pieces; 'installation' is for mounting, attaching, or setting up a product to be used.
+    - 'build quality' is for the solidity/craftsmanship of construction -- 'feels solid', 'doesn't flex', 'fell apart'. 'durability' is for withstanding wear, damage, or breakdown over repeated use or time -- 'still works after months', 'scratches easily', 'broke after a week'.
+    - 'stability' is for whether the product stands, balances, or stays in place without tipping, wobbling, or sliding -- distinct from 'build quality' (solidity of construction) and 'durability' (wear resistance over time).
+    - 'color' is for hue/tint/shade specifically; 'design' is for styling or shape choices; 'style' is for overall fashion/aesthetic-language preference; 'appearance' is only for a general look/aesthetic impression not already covered by color, design, style, or scratch resistance.
+    - 'condition' is for the item's physical state from wear, damage, dirt, or how it arrived or aged -- 'a scuff on arrival', 'filthy', 'cover looks dragged down a road' -- distinct from 'appearance' (an intentional aesthetic/design impression) and from 'build quality'/'durability' (structural solidity and wear resistance).
+    - 'scratch resistance' is for whether a surface resists scratches or marks.
+    - 'reliability' is for whether the product keeps working without failing or malfunctioning over time -- use it even when the complaint text centers on contacting support about the failure (the failure itself is 'reliability', the support interaction is excluded) -- UNLESS the review describes only a single defective-on-arrival unit that was promptly replaced, which is not a reliability aspect (see the fulfillment-incident exclusion above).
+    - 'functionality' is for a holistic does-it-work-as-intended judgment about the product's core purpose, ONLY when no more specific mechanism or action is named in the review -- prefer a specific action/mechanism facet instead whenever the review names one, e.g. 'dispensing', 'organization', 'adjustability', 'educational value', 'ease of cleanup'; don't default to 'functionality' as a catch-all for a review describing a particular task or feature.
+    - Other generic names to prefer over narrower compounds: effectiveness, capacity, included accessories, plot, characters, dialogue, pacing, engagement, entertainment, content quality.
+  - Deduplicate facets. At most 6, the most salient -- but most reviews genuinely have only 2-4 clear aspects. Never pad the list with generic or weakly-supported facets (e.g. 'user experience', 'versatility', 'additional features') just to approach the cap. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Arrived in two days, super fast! The case itself feels solid and doesn't flex when I squeeze it, but the matte grey finish shows fingerprints constantly and looks smudged five minutes after wiping it down. It came with a spare set of screws and a little cleaning cloth, which was a nice surprise. A bit pricey for what it is, but I don't regret the purchase.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and doesn't flex when I squeeze it
+    - facet: appearance
+      polarity: negative
+      evidence: shows fingerprints constantly and looks smudged
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a spare set of screws and a little cleaning cloth
+    - facet: value
+      polarity: positive
+      evidence: A bit pricey for what it is, but I don't regret the purchase
+- user: |-
+    Putting together the bookshelf took about 20 minutes with the included Allen wrench, no problem at all. Once assembled it feels sturdy and doesn't wobble even when fully loaded with books. The stain is a lovely deep walnut, richer than I expected from the photos. One shelf already has a noticeable scuff mark on it after just two weeks of light use. The listing said it comes with matching drawer pulls but it did not -- kind of annoying, though obviously not the shelf's fault.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: took about 20 minutes with the included Allen wrench, no problem at all
+    - facet: build quality
+      polarity: positive
+      evidence: feels sturdy and doesn't wobble even when fully loaded
+    - facet: color
+      polarity: positive
+      evidence: a lovely deep walnut, richer than I expected
+    - facet: scratch resistance
+      polarity: negative
+      evidence: already has a noticeable scuff mark on it after just two weeks of light use
+- user: |-
+    This soap dispenser pumps out just the right amount every time, no clogging or sputtering. One corner of the base had a small scuff when it arrived, but it doesn't bother me. It tips over pretty easily if you bump the counter, so I keep it pushed against the wall. I did get a first unit with a cracked pump top, but Amazon replaced it within two days and this one has been perfect since.
+  assistant:
+    aspects:
+    - facet: dispensing
+      polarity: positive
+      evidence: pumps out just the right amount every time, no clogging or sputtering
+    - facet: condition
+      polarity: negative
+      evidence: small scuff when it arrived
+    - facet: stability
+      polarity: negative
+      evidence: tips over pretty easily if you bump the counter
+- user: |-
+    The listing said this shelf bracket was a 'no-drill' peel-and-stick design, but that's not true -- you actually have to drill four small holes to mount it, which is not what I expected when I ordered it. The listing really should say that. Once I drilled it in with the included screws though, it feels rock solid and hasn't budged an inch in three weeks.
+  assistant:
+    aspects:
+    - facet: installation
+      polarity: negative
+      evidence: you actually have to drill four small holes to mount it, which is not what I expected
+    - facet: build quality
+      polarity: positive
+      evidence: it feels rock solid and hasn't budged an inch
+- user: |-
+    I almost bought the NutriBlend 3000 instead -- it has a bigger 64oz pitcher and a stronger 1200-watt motor. But this one was $30 cheaper, and it still crushes ice into snow in seconds. Cleanup is a breeze too, everything just rinses off under the tap in about a minute.
+  assistant:
+    aspects:
+    - facet: ice crushing
+      polarity: positive
+      evidence: crushes ice into snow in seconds
+    - facet: ease of cleaning
+      polarity: positive
+      evidence: everything just rinses off under the tap in about a minute
