@@ -49,5 +49,14 @@ cp "$WORKDIR"/repo/infra/gcp/sync-checkpoint.service /etc/systemd/system/
 cp "$WORKDIR"/repo/infra/gcp/sync-checkpoint.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now vllm.service sync-checkpoint.timer
-systemctl enable --now extract.service
+# The full pass only starts once the go-flag exists in GCS -- the gates
+# (serving equivalence + throughput pilot) run against bare vLLM first.
+# After preemption the flag is already there, so the job resumes unattended.
+if gsutil -q stat "$BUCKET/ctl/run_extract"; then
+  systemctl enable --now extract.service
+  echo "run_extract flag present: extraction started"
+else
+  systemctl disable --now extract.service 2>/dev/null || true
+  echo "no run_extract flag: gates mode (vLLM only)"
+fi
 echo "=== emmr startup done ==="
