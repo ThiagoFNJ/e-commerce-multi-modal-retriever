@@ -21,13 +21,13 @@ else
   git -C repo fetch origin "$BRANCH" && git -C repo reset --hard "origin/$BRANCH"
 fi
 
-# --- python env (system conda python from the DL image) ---
-PIP=/opt/conda/bin/pip
-PY=/opt/conda/bin/python
-$PIP show vllm >/dev/null 2>&1 || $PIP install -q vllm
-$PIP show emmr >/dev/null 2>&1 || {
-  $PIP install -q pandas pyarrow httpx pyyaml tqdm ollama
-  $PIP install -q --no-deps -e "$WORKDIR/repo"
+# --- python env (system python; the ubuntu DLVM images have no /opt/conda) ---
+apt-get install -y -q python3-pip git >/dev/null 2>&1 || true
+PY=/usr/bin/python3
+$PY -m pip show vllm >/dev/null 2>&1 || $PY -m pip install -q vllm
+$PY -m pip show emmr >/dev/null 2>&1 || {
+  $PY -m pip install -q pandas pyarrow httpx pyyaml tqdm ollama
+  $PY -m pip install -q --no-deps -e "$WORKDIR/repo"
 }
 
 # --- data + checkpoint resume ---
@@ -37,10 +37,7 @@ gsutil -q cp "$BUCKET/ckpt/review_aspects.jsonl" ckpt/review_aspects.jsonl 2>/de
 echo "checkpoint lines at boot: $(wc -l < ckpt/review_aspects.jsonl 2>/dev/null || echo 0)"
 
 # --- model weights (cached on the boot disk across restarts of the same VM) ---
-$PY - <<'EOF'
-from huggingface_hub import snapshot_download
-snapshot_download("google/gemma-4-12B")
-EOF
+$PY -c 'from huggingface_hub import snapshot_download; snapshot_download("google/gemma-4-12B")'
 
 # --- services ---
 cp "$WORKDIR"/repo/infra/gcp/vllm.service /etc/systemd/system/

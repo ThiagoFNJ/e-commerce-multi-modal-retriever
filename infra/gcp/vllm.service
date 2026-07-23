@@ -3,7 +3,7 @@ Description=vLLM OpenAI-compatible server (gemma-4-12B, BF16)
 After=network-online.target
 
 [Service]
-ExecStart=/opt/conda/bin/vllm serve google/gemma-4-12B \
+ExecStart=/usr/local/bin/vllm serve google/gemma-4-12B \
   --dtype bfloat16 \
   --max-model-len 4096 \
   --gpu-memory-utilization 0.92 \
