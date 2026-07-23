@@ -1,0 +1,23 @@
+[Unit]
+Description=emmr review-aspect extraction (full corpus, resumable)
+After=vllm.service
+Requires=vllm.service
+
+[Service]
+WorkingDirectory=/opt/emmr/repo
+# wait for the vLLM health endpoint before starting work
+ExecStartPre=/bin/bash -c 'until curl -sf http://localhost:8000/health; do sleep 5; done'
+ExecStart=/opt/conda/bin/python scripts/05_extract_review_aspects.py \
+  --input /opt/emmr/data/reviews_slim.parquet \
+  --workers 32
+Environment=EMMR_EXTRACTION_BACKEND=openai
+Environment=EMMR_EXTRACTION_ENDPOINT=http://localhost:8000/v1
+Environment=EMMR_EXTRACTION_ENDPOINT_MODEL=google/gemma-4-12B
+Environment=EMMR_CHECKPOINT=/opt/emmr/ckpt/review_aspects.jsonl
+Restart=on-failure
+RestartSec=30
+# final checkpoint sync when the unit stops for any reason (incl. preemption shutdown)
+ExecStopPost=/usr/bin/gsutil -q cp /opt/emmr/ckpt/review_aspects.jsonl gs://emmr-9122a143/ckpt/review_aspects.jsonl
+
+[Install]
+WantedBy=multi-user.target

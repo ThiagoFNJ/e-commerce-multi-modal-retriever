@@ -37,6 +37,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=1,
                     help=">1 keeps N model calls in flight (batching servers, e.g. vLLM)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--input", default=None,
+                    help="pre-built slim parquet (asin, review_no, text) instead of the "
+                         "corpus loader -- used on the GPU box, which only ships the slim file")
     ap.add_argument("--finalize", action="store_true",
                     help="compact the checkpoint into the review-grain parquet and exit")
     args = ap.parse_args()
@@ -50,7 +53,12 @@ def main() -> None:
         logging.info("wrote %s: %d aspect rows over %d reviews", config.REVIEW_ASPECTS, len(df), n_reviews)
         return
 
-    reviews = load_reviews()
+    if args.input:
+        import pyarrow.parquet as pq
+
+        reviews = pq.read_table(args.input).to_pandas()
+    else:
+        reviews = load_reviews()
     full_count = len(reviews)
     logging.info("reviews with text: %d", full_count)
 

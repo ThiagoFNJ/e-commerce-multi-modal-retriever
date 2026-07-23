@@ -64,7 +64,9 @@ ASPECT_DEDUP_THRESHOLD = 0.85                   # cosine threshold for vocabular
 # aggregate the per-review aspects.
 
 GOLD_DIR = INTERIM / "gold"                                   # annotation sheet, manifest, frozen gold splits
-REVIEW_ASPECTS_CHECKPOINT = INTERIM / "review_aspects.jsonl"  # append-only, crash-safe, resumable
+REVIEW_ASPECTS_CHECKPOINT = Path(              # append-only, crash-safe, resumable
+    os.environ.get("EMMR_CHECKPOINT", str(INTERIM / "review_aspects.jsonl"))
+)
 REVIEW_ASPECTS = PROCESSED / "review_aspects.parquet"        # released annotation (review grain)
 PRODUCT_ASPECTS = PROCESSED / "product_aspects.parquet"      # derived, index-facing (product grain)
 
