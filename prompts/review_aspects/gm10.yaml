@@ -1,6 +1,16 @@
 parent: gm3
 created: '2026-07-22'
-status: candidate
+status: winner (finalized 2026-07-23)
+scores:
+  dev_semantic_f1: 0.6416
+  test_semantic_f1: 0.5838
+  test_semantic_f1_ci: [0.5464, 0.6217]
+  test_precision: 0.604
+  test_recall: 0.5648
+  test_polarity_accuracy: 0.9592
+  test_polarity_ci: [0.9368, 0.9787]
+  test_exact_f1: 0.5108
+  n_test: 350
 model: gemma4:12b
 experiment: honest-loop
 reflector: sonnet subagent, template_v1

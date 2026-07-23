@@ -415,7 +415,31 @@ Findings:
 **Final selection: gemma4:12b + prompt gm10** (`EXTRACTION_MODEL`,
 `EXTRACTION_PROMPT_VERSION`). Dev 0.6416 / P 0.647 / R 0.636 / polarity 0.943. The dev
 number is a maximum over many selection events (winner's curse); the reportable figure
-comes from the single §5.3 finalize on test-350, still untouched.
+comes from the single §5.3 finalize on test-350.
+
+### 5.7 Finalize — the datasheet number (2026-07-23, test-350, single scoring)
+
+| metric | held-out test-350 |
+|---|---|
+| facet F1 (semantic θ=0.80) | **0.5838** — 95% CI [0.5464, 0.6217] |
+| facet precision / recall | 0.604 / 0.565 |
+| polarity accuracy (matched) | **0.9592** — 95% CI [0.9368, 0.9787] |
+| facet F1 (exact string) | 0.5108 |
+
+Readings: (a) the **dev→test drop is −5.8 pp** (0.6416 → 0.5838) — the winner's curse
+made concrete: dev selected the best of ~40 candidates across prompt and model, and this
+is the price. It is *understated* if anything, since dev oversamples hard strata while
+test is proportional. Reporting the drop is part of the result. (b) The exact-match F1
+(0.5108) now sits close to the semantic number — the optimized prompt learned the gold
+vocabulary well enough that most matches are literal, versus the huge exact/semantic gap
+at baseline (0.264 vs 0.469). (c) Polarity at 0.959 held-out confirms the neutral-facet
+decomposition: the sub-task the literature finds weakest is this pipeline's strongest.
+(d) Against the literature's 46–65 ATE F1 band, 0.584 held-out with CIs, on a released
+protocol, is a defensible mid-band result for a 12B local extractor. Journey, end to
+end: 0.469 (v0 on qwen3:8b, dev) → 0.584 (gemma4:12b + gm10, held-out test).
+
+The extraction stage is **closed**: engine, gold set, optimization, model selection, and
+the held-out number all final. Test-350 must not be touched again (§5.3).
 
 ---
 
@@ -462,5 +486,7 @@ held-out scores with CIs, star-consistency results by slice, and known limitatio
 | Gold set (600; dev 248 / test 350 frozen) | **DONE** — labeled, arbitrated, frozen 2026-07-21; proportional sampler mode pending |
 | Metrics (semantic-match P/R/F1, matched-only polarity, bootstrap) | DECIDED, implemented — baseline v2 scored on dev (`eval_gold.py`) |
 | Star cross-check | DECIDED — function pending |
-| Optimization harness (§5) | implemented — round 1 run (10 candidates, v11 selected; §5.4) |
+| Optimization harness (§5) | implemented — round 1 (§5.4), model bracket (§5.5), honest rerun (§5.6) |
+| Extractor + prompt selection | **DONE** — gemma4:12b + gm10 (§5.6) |
+| Held-out test score (§5.3 finalize) | **DONE** — semantic F1 0.5838 [0.546, 0.622], polarity 0.959 (§5.7); test sealed |
 | v1 scope (full vs first-k) | OPEN — decided by pilot throughput |
