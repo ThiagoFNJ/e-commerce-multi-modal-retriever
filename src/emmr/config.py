@@ -55,6 +55,10 @@ EXTRACTION_PROMPT_VERSION = "gm10"               # active prompt: prompts/review
 EXTRACTION_BACKEND = os.environ.get("EMMR_EXTRACTION_BACKEND", "ollama")
 EXTRACTION_ENDPOINT = os.environ.get("EMMR_EXTRACTION_ENDPOINT", "http://localhost:11434/v1")
 EXTRACTION_ENDPOINT_MODEL = os.environ.get("EMMR_EXTRACTION_ENDPOINT_MODEL", "")  # "" -> EXTRACTION_MODEL
+# JSON dict forwarded as vLLM's request-level `chat_template_kwargs`
+# (e.g. '{"enable_thinking": false}' — Qwen3's thinking switch lives in the chat
+# template, not in `reasoning_effort`)
+EXTRACTION_CHAT_TEMPLATE_KWARGS = os.environ.get("EMMR_EXTRACTION_CHAT_TEMPLATE_KWARGS", "")
 
 BACKOFF_FLOOR = 1_000                           # min reviews for a category bucket to be mined
 ASPECT_TOP_K = 8                                # facets kept per product (tunable)

@@ -127,6 +127,8 @@ def _openai_chat(**kwargs):
                             "schema": kwargs.get("format") or ASPECT_SCHEMA},
         },
     }
+    if config.EXTRACTION_CHAT_TEMPLATE_KWARGS:
+        payload["chat_template_kwargs"] = json.loads(config.EXTRACTION_CHAT_TEMPLATE_KWARGS)
     url = config.EXTRACTION_ENDPOINT.rstrip("/") + "/chat/completions"
     response = httpx.post(url, json=payload, timeout=300.0)
     if response.status_code == 400 and "reasoning" in response.text:
