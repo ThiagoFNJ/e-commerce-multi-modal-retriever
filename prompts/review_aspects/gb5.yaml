@@ -1,0 +1,221 @@
+parent: gb2
+created: '2026-07-23'
+status: candidate
+model: gemma4:12b-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'gb2 is the current best (F1 0.4974) but three of its top-3 FP masses are unresolved and, for two
+  of them, this is the SECOND consecutive round the same rule text has failed to stop the leak: ''value
+  for money'' (FP 13) is explicitly named as excluded (''reasonable price'' is literally in the rule text)
+  yet still fires directly against that exact phrasing in B088H3P77R#7 (''Quality product at a reasonable
+  price'' -> pred includes ''value for money: positive'', gold wants only power+build quality) and B002L3TS5M#11
+  (''quite expensive'' -> pred ''value for money: negative'', gold wants ''value: neutral'' which the
+  0.80 matcher would likely have caught on the right name but the model produced the wrong polarity/framing
+  anyway). ''durability'' is now TIED for the single largest FP mass (15) while also appearing in the
+  FN list (3) -- meaning it is genuinely a valid gold facet sometimes but is being used as a generic catch-all
+  the rest of the time; three worst-review reviews show it substituting for a more specific gold term
+  (B00IN9W73S#5: ''fell apart'' -> gold ''build quality'', pred ''durability''; B06W532RC3#12: ''box seems
+  sturdy'' -> gold ''case quality'', pred ''durability''; B07FTS5166#6: ''leash can handle him'' -> gold
+  ''strength'', pred ''durability''). Note gb3 already tried the blunt fix (ban the word ''durability''
+  outright) and F1 DROPPED to 0.4784 -- almost certainly because it also erased the 3 cases where ''durability''
+  is the correct gold name and cosine similarity to ''reliability''/''build quality'' sits near the 0.80
+  boundary, so gb5 does NOT re-ban the word; instead it narrowly redefines it (wear/degradation over TIME,
+  as opposed to build quality''s one-time construction check) so it stays available for genuine cases
+  while losing its role as a bucket term. ''effectiveness'' is the other tied-largest FP mass (15) and
+  the worst-review evidence shows it substituting for terms that are already ON the specific-dimension
+  example list or should be: B004PBIKHU#1 (gold ''performance'', pred ''effectiveness''), B088H3P77R#7
+  (gold ''power'', pred ''effectiveness''), B01M2YXRM9#8 (gold ''functionality'' alone, pred split into
+  ''effectiveness''+''reliability'', a redundant-facet FP). ''customer service'' FPs persist (7) despite
+  gb2''s exclusion rule already enumerating ''support responsiveness'' and ''replacement-parts availability''
+  verbatim -- B07ZHYS7MD#6 leaks THREE FPs at once (''charging station: negative'', ''customer support:
+  negative'', ''replacement parts: negative'' against a gold of just ''reliability: negative''), showing
+  the model is also naming the literal failed component instead of the dimension it represents, a distinct
+  problem the current rule text never addresses. Two worst reviews (1547602589#11, B00JNQKR8C#9) show
+  gold using ''engagement'' for creative works (''kept me flipping pages'', ''gripped me from the first
+  page'') which is not on the craft-dimension list gb2 added, so the model falls back to ''plot'' for
+  both the twist judgment AND the page-turner feeling, and in 1547602589#11 this produces an outright
+  dedup violation the existing rule already forbids: ''plot: positive'' and ''plot: negative'' output
+  for the same review. Two other worst reviews (B07Y5WMGGG#12, B07BHKVZPX#8) show ''versatility'' (FP
+  5) displacing ''appearance'' (FN 14, tied-largest miss mass with build quality) specifically in sentences
+  that combine a visual judgment with a use-case/wearability framing (''bling so you can wear day or night''
+  -> pred ''versatility'', gold ''appearance''; ''looks like quality without looking feminine'' -> pred
+  ''versatility'', gold ''appearance''+''material''). B00IN9W73S#5 additionally shows a two-clause short
+  review (''pretty but fell apart'') where only the second, more salient clause was extracted -- a general
+  under-extraction pattern the CONSOLIDATE rule''s ''most reviews need only 1-3 facets'' framing doesn''t
+  guard against. gb5 makes six system-rule edits, each tied to one of the above masses, and does not repeat
+  gb3''s word-ban or gb4''s recommendation-ban (both already tried from this same parent and both scored
+  worse than gb2). It also makes the two allowed few-shot changes: rewrites the book example to add ''engagement''
+  as a facet distinct from ''plot'' (directly targeting the two worst reviews with a missed engagement
+  facet and the plot/plot dedup violation), and adds one new synthetic example whose sole extra purpose
+  is demonstrating that a price/value mention is dropped entirely -- not merged into any facet -- even
+  when it sits next to genuine product qualities, since the existing price framing (inside the longer
+  blender example, ''a bit pricey, but worth it'') has not been sufficient across two rounds to suppress
+  this FP mass.'
+change_summary: '1. Product-intrinsic exclusion rule: reframed the price/value exclusion from a phrase
+  list to an outcome rule (drop price/value content under ANY name, not just ''value for money'') and
+  added a component-name-to-dimension instruction (name the failing DIMENSION, e.g. ''reliability'', never
+  the literal part name). Targets ''value for money'' FP=13 (still leaking on the exact phrases already
+  named in gb2''s rule, per B088H3P77R#7 and B002L3TS5M#11) and the 3-way FP leak in B07ZHYS7MD#6 (''charging
+  station'', ''customer support'', ''replacement parts'' against a gold of just ''reliability'').
+
+  2. Added ''engagement'' (how gripping / hard to put down) to the creative-work craft-dimension list.
+  Targets 1547602589#11 and B00JNQKR8C#9, both missing ''engagement'' in gold with the model instead over-using
+  ''plot'' (including outputting ''plot'' twice with opposite polarities in 1547602589#11).
+
+  3. New rule: a visual/look statement is always ''appearance'', extracted IN ADDITION to any versatility/use-case
+  dimension in the same sentence, not instead of it. Targets ''versatility'' FP=5 displacing ''appearance''
+  (FN=14, tied-largest miss) in B07Y5WMGGG#12 and B07BHKVZPX#8.
+
+  4. CONSOLIDATE rule: added an explicit ''pick the dominant polarity, never output a facet twice with
+  different polarities'' clause, and an explicit ''don''t drop a clause just because a later one is more
+  salient'' clause. Targets the plot/plot polarity-conflict dedup violation in 1547602589#11 and the dropped
+  ''pretty'' clause in B00IN9W73S#5.
+
+  5. Specific-dimension examples: added ''power'', ''performance'', ''scratch resistance'', ''ease of
+  cleaning''. ''power'' and ''performance'' are grounded in worst-review gold names (B088H3P77R#7, B004PBIKHU#1)
+  that the model replaced with ''effectiveness'' (tied-largest FP mass, 15); ''scratch resistance'' and
+  ''ease of cleaning'' are aggregate top-15 missed facets not previously covered.
+
+  6. Redefined ''durability'' (added to the canonical fallback list with a narrow definition: wear/degradation
+  over TIME, distinct from ''build quality'' which is a one-time construction check, and distinct from
+  naming a specific stress test directly) instead of banning the word as gb3 did (gb3 scored 0.4784, worse
+  than gb2''s 0.4974) -- durability is simultaneously the tied-largest FP mass (15) AND appears in the
+  FN list (3), so it needs disambiguation, not removal. Also tightened ''reliability'' to ''functioning
+  without failure'' to reduce overlap with the new durability definition.
+
+  7. Rewrote few-shot example 7 (book, synthetic): added an explicit ''engagement'' facet (''had me up
+  until 2am, unable to put it down'') alongside plot/characters/writing quality, modeling engagement as
+  distinct from plot.
+
+  8. Added few-shot example 9 (space heater, synthetic): demonstrates a price/value mention (''reasonably
+  priced for what you get'') dropped entirely -- not merged into build quality or any other facet -- while
+  the real functionality, reliability, and build-quality statements in the same review are correctly kept,
+  directly targeting the unresolved value-for-money FP mass.'
+version: gb5
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'build quality', 'sizing accuracy', 'ease of use'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and anything about buying or owning the product rather than the product itself. Price/value: if a sentence's only content is the price, cost, value for money, or whether it's "worth it" / "a reasonable price" / "expensive" / "a good deal", do not create a facet for it under any name -- not 'value for money', not 'effectiveness', not anything else. When price is mentioned alongside a real product quality ("quality product at a reasonable price"), extract only the quality, and drop the price framing entirely. Customer service: exclude support responsiveness, replacement-parts availability, warranty handling, and how fast or slow the seller/manufacturer replied, in any form. If a product component fails or is described as broken/not working, name the underlying DIMENSION the failure represents (e.g. a part that stops working over time is 'reliability'), never the literal part/component name and never the service response to it. If a sentence mixes a real product complaint with a service/support complaint (e.g. "the charger stopped working and support never replied"), extract only the product part, named as a dimension.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names; never a named character, person, actor, or title -- for books, movies, and other creative works, name the CRAFT dimension being judged instead (e.g. 'plot', 'characters', 'writing quality', 'content quality', 'pacing', 'engagement' (how gripping / hard to put down), 'video quality', 'audio quality'), not the character's or performer's name.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - A visual/look statement ('looks sleek', 'bling', a color or finish mention, 'looks cheap/expensive') is always the 'appearance' dimension, even inside a sentence whose main topic is a different dimension like versatility or use-cases -- extract appearance IN ADDITION to that other dimension, don't let one crowd out the other.
+  - CONSOLIDATE: if several sentences all describe the same underlying dimension (e.g. multiple specific examples of the product working, or not working, as intended), report ONE facet for that dimension, not one per example, picking the dominant/net polarity if they disagree -- never output the same facet name twice with different polarities. Most reviews need only 1-3 facets, but don't drop a distinct clause just because a later clause in the same sentence is more salient -- "X but Y" about two different dimensions is two facets, even in a short review. Use more than 1-3 only when the review clearly discusses several distinct dimensions.
+  - Name the SPECIFIC dimension the review is actually about -- 'installation', 'assembly', 'adjustability', 'cord length', 'cup size', 'subtitles', 'ingredient transparency', 'included accessories', 'power', 'performance', 'scratch resistance', 'ease of cleaning' are all better facets than a vague bucket term when the review is clearly about that specific thing. Only fall back to one of these broad names when the review is genuinely about the general quality and no more specific name fits: effectiveness (does it achieve its core purpose), functionality (do its features work as intended), reliability (does it keep functioning without failure, glitches, or breakdowns over repeated use), durability (does the material/construction resist wearing out, breaking, or degrading from extended use over TIME -- distinct from build quality, which is a one-time construction/material assessment made at first use or unboxing, and distinct from naming one specific stress test directly, e.g. 'strength' or 'scratch resistance'), build quality (construction, sturdiness, materials holding up at first use), appearance (look, style, design, color, finish -- these are all the same dimension), size (actual physical dimensions), sizing accuracy (fit relative to the size ordered), ease of use (day-to-day operation, not a one-time setup step like installation or assembly), material, comfort.
+  - Deduplicate facets: never output the same facet name twice in one review under any polarity (see CONSOLIDATE for merging conflicting-sentiment mentions of the same dimension). At most 6 facets, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender chops ice, purees soup, and crushes frozen fruit without any hiccups - it just works every time. It feels solid and heavy, not flimsy at all, and looks sleek on the counter in brushed steel. It came with two extra jars and a recipe booklet, which was a nice surprise. A bit pricey, but worth it for how well it's built.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: chops ice, purees soup, and crushes frozen fruit without any hiccups
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and heavy, not flimsy at all
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter in brushed steel
+    - facet: included accessories
+      polarity: positive
+      evidence: came with two extra jars and a recipe booklet
+- user: |-
+    This drone flies exactly like it's supposed to and hasn't glitched once in three months of daily use. It's way bigger than I expected, taking up my whole shelf. The matte black finish looks cheap, and one of the propellers cracked after a light bump. When I emailed about the crack, support took two weeks to reply and never sent a replacement.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: flies exactly like it's supposed to
+    - facet: reliability
+      polarity: positive
+      evidence: hasn't glitched once in three months of daily use
+    - facet: size
+      polarity: neutral
+      evidence: way bigger than I expected, taking up my whole shelf
+    - facet: appearance
+      polarity: negative
+      evidence: matte black finish looks cheap
+    - facet: build quality
+      polarity: negative
+      evidence: one of the propellers cracked after a light bump
+- user: |-
+    This thriller had me up until 2am, unable to put it down - once I started I couldn't stop turning pages. The twists themselves are clever and never feel cheap. The lead investigator is stubborn and funny in a way that feels real, and by the end I actually cared what happened to her. My only complaint is the prose gets clunky in the middle third, some sentences you have to reread twice.
+  assistant:
+    aspects:
+    - facet: engagement
+      polarity: positive
+      evidence: had me up until 2am, unable to put it down
+    - facet: plot
+      polarity: positive
+      evidence: The twists themselves are clever and never feel cheap
+    - facet: characters
+      polarity: positive
+      evidence: The lead investigator is stubborn and funny in a way that feels real
+    - facet: writing quality
+      polarity: negative
+      evidence: the prose gets clunky in the middle third
+- user: |-
+    The frame went together in about ten minutes, no tools missing and the instructions were clear. Once assembled it's sturdy and doesn't wobble at all. I did email about a missing bolt and it took three weeks and two follow-ups to get a response, which was annoying.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: The frame went together in about ten minutes, no tools missing and the instructions were
+        clear
+    - facet: build quality
+      polarity: positive
+      evidence: it's sturdy and doesn't wobble at all
+- user: |-
+    The heater warms up my room in minutes and hasn't had a single issue in six months of daily use. It's solidly built too, and reasonably priced for what you get.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: warms up my room in minutes
+    - facet: reliability
+      polarity: positive
+      evidence: hasn't had a single issue in six months of daily use
+    - facet: build quality
+      polarity: positive
+      evidence: It's solidly built

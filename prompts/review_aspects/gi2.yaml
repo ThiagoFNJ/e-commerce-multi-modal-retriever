@@ -1,0 +1,128 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The v2 baseline (F1 0.5462) beats gi1 (F1 0.4889), so gi1''s big enumerated vocabulary block should
+  not simply be re-tried -- instead I target the SAME largest measured error masses but with (a) a much
+  shorter, tighter rule set and (b) a concrete new few-shot example that demonstrates the distinctions
+  in action, on the hypothesis that gi1 failed because abstract paired rules without reinforcing examples
+  are hard for the extractor to apply consistently. Evidence used: (1) ''appearance'' is the single largest
+  missed-gold facet (FN=18) and is completely absent from the current few-shot set -- three of the worst
+  reviews (B07Y5WMGGG, B00IN9W73S, B01MR1IBLI) drop ''pretty''/''bling''/''not so cute'' entirely. (2)
+  ''size''(FN=10)/''sizing accuracy''(FP=9) is a clean near-synonym pair sitting right at the semantic-matching
+  threshold, and the current prompt itself trains the wrong name in its own rule example and in few-shot
+  #3 -- both are fixed. (3) ''durability''(FP=13, the single biggest FP) is systematically substituted
+  for ''build quality''(FN=15) on immediate-defect reviews (B07P7Z12DV ''wires aren''t connecting''->durability
+  instead of reliability/build quality; B00IN9W73S ''fell apart''->durability instead of build quality),
+  so a wear-over-time vs immediate-defect distinction is added. (4) ''material quality''/''texture''(FP=9/8)
+  replace ''build quality''/''softness'' on two reviews (B00NYAD2J4, B07GXM22ZD) about soft, well-made
+  items -- craftsmanship-judgment language should map to build quality, not raw-material language. (5)
+  ''performance''(FP=3) substitutes for ''functionality''(FN=12)/''effectiveness''(FN=11) three times
+  (B07PH18JS2, B07P7Z12DV, B0837CR4XK). (6) ''compatibility''(FP=3) substitutes for gold ''fitment'' (B07PH18JS2),
+  and B07CXP6F5J shows the model splitting one multi-part fitment complaint into four separate per-component
+  facets instead of one -- a decomposition rule is added. (7) ''ease of installation''(FP=4) vs gold ''installation''(FN=5)
+  is a pure naming mismatch. (8) ''included accessories''(FN=6) never appears in few-shot (B07Y5WMGGG''s
+  included tool is dropped). (9) Two worst reviews (B003VOX1XU, B0837CR4XK) show the model anchoring polarity
+  to the first clause of a review even when the reviewer''s own trajectory resolves positive later --
+  a net-verdict rule and a demonstrating example are added. (10) Several gold neutrals (feedback, value,
+  sturdiness) are never predicted -- the model appears to default away from neutral -- so a usage rule
+  is added, reinforced in the new example. (11) B09431D2DX (a book review) scores 0 with an empty prediction
+  against three gold facets (plot, characters, writing quality) because the current ''DIMENSION'' framing
+  and all four few-shot examples are physical-product only; one clause extends the definition to narrative/creative
+  qualities. Per the at-most-2-example-change budget, I renamed few-shot #3''s facet (''sizing accuracy''->''size'')
+  and added one new synthetic example that packs six of the above lessons (fitment consolidation, build-quality-vs-fitment,
+  appearance, included accessories, trajectory-based polarity, neutral effectiveness) into a single demonstration,
+  leaving the other three original examples untouched since none of the worst-scoring evidence implicates
+  their patterns (negation, empty-review, fulfillment-exclusion, non-English).'
+change_summary: '1) Swapped the illustrative facet example and few-shot #3''s facet from ''sizing accuracy''
+  to ''size'' (size FN=10, sizing accuracy FP=9). 2) Added a ''one facet per dimension, not per part/mention''
+  rule to stop per-component decomposition seen in B07CXP6F5J. 3) Added a compact canonical-naming-pairs
+  rule covering the largest FP/FN mismatches: build quality vs material quality/texture; durability (wear-over-time
+  only) vs build quality (immediate defect); reliability vs functionality/effectiveness vs ''performance'';
+  fitment vs ''compatibility''; installation vs ''ease of installation''; appearance; included accessories.
+  4) Added a neutral-polarity usage rule for matter-of-fact/mixed remarks (feedback, value, sturdiness
+  golds were never predicted). 5) Added an overall/concluding-verdict rule for dimensions whose sentiment
+  shifts across the review (B003VOX1XU, B0837CR4XK both anchored on the first clause instead). 6) Extended
+  the facet definition to narrative/creative qualities for media products (plot, characters, writing quality),
+  since a book review scored 0 with an empty prediction. 7) Added one new synthetic few-shot example (cabinet
+  hardware, 6 aspects) demonstrating fitment consolidation, build-quality-vs-fitment, appearance, included
+  accessories, trajectory-based polarity, and neutral effectiveness together.'
+version: gi2
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+  - One facet per dimension, even when several parts or mentions are affected: if three components all fit poorly, that is one 'fitment' aspect, not three.
+  - Prefer these names over near-synonyms: 'build quality' (not material quality/texture) for craftsmanship or structural failure -- broke, fell apart, loose, cheaply made; 'durability' only for gradual wear or degradation over time, not an immediate defect; 'reliability' for consistency across repeated use or intermittent failure (stops working, cuts out); 'functionality' or 'effectiveness' (not 'performance') for whether the product does its job or achieves the intended result; 'fitment' (not 'compatibility') for whether a part attaches or fits correctly; 'installation' (not 'ease of installation'); 'appearance' for look, color, or style; 'included accessories' for extra items that came in the box.
+  - Use polarity 'neutral' when the reviewer states a fact about a dimension without clear praise or criticism, e.g. a mild, so-so, or purely descriptive remark.
+  - If a dimension is mentioned more than once with shifting sentiment, use the reviewer's overall or concluding verdict on it, not just the first mention.
+  - Product dimensions include narrative or creative qualities for media (plot, characters, writing quality, sound quality) as well as physical ones.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Both cabinet hinges felt loose right out of the box and the latch snapped off after a week of normal use. The brushed-nickel finish still looks great though, and it came with extra mounting screws I wasn't expecting. The diagram was confusing to start with, but once I got past step one, putting it together went quickly. It holds the weight of my dishes fine so far, nothing special either way.
+  assistant:
+    aspects:
+    - facet: fitment
+      polarity: negative
+      evidence: Both cabinet hinges felt loose right out of the box
+    - facet: build quality
+      polarity: negative
+      evidence: the latch snapped off after a week of normal use
+    - facet: appearance
+      polarity: positive
+      evidence: brushed-nickel finish still looks great
+    - facet: included accessories
+      polarity: positive
+      evidence: it came with extra mounting screws I wasn't expecting
+    - facet: installation
+      polarity: positive
+      evidence: once I got past step one, putting it together went quickly
+    - facet: effectiveness
+      polarity: neutral
+      evidence: holds the weight of my dishes fine so far, nothing special either way

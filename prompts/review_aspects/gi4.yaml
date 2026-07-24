@@ -1,0 +1,115 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'v2 (F1 0.5462) remains the best candidate in this lineage; gi1''s broad five-way vocabulary block
+  (build vs material, durability vs reliability, functionality vs effectiveness, fitment vs compatibility,
+  size vs fit, plus appearance) overloaded the model and cost -0.057 F1, and gi2/gi3''s edits inside the
+  size/sizing-accuracy/fit cluster also underperformed v2. Rather than re-touching that cluster or re-adding
+  a large multi-topic block, this round targets only the two largest untouched error masses with narrow,
+  example-grounded fixes. (1) ''appearance'' is the single biggest missed gold facet (FN=18) and is completely
+  absent from both the system rules and all four few-shot examples -- the model has never seen it demonstrated.
+  (2) ''build quality'' is the second-biggest missed facet (FN=15) and lines up almost exactly with the
+  model''s two most common false positives, ''material quality'' (FP=9) and ''texture'' (FP=8): the worst-scoring
+  reviews about plush toys and gift items (e.g. a soft, high-quality bunny; a soft, well-made baby blanket)
+  show gold labeling ''build quality''+''softness'' while the model predicts ''material quality''+''texture''
+  for the same sentences -- a clean renaming error, not a genuine disagreement about content. (3) A smaller
+  but still concentrated cluster: ''functionality'' (FN=12) and ''effectiveness'' (FN=11) are both heavily
+  missed, and in one worst-scoring review the model predicted the vague catch-all ''performance'' (FP=3
+  overall) where gold wanted ''functionality'' -- a direct, evidenced swap. All three fixes are additive
+  single bullets (not a restructured rule block) plus two new synthetic few-shot examples (the two-example
+  budget) that jointly demonstrate all three new facets, since no existing example shows any of appearance,
+  build quality, functionality, or effectiveness. The size/sizing-accuracy/fit vocabulary and all four
+  original examples are left untouched because that territory was already probed by gi2/gi3 without beating
+  v2, and per the loop protocol should not be re-proposed without new evidence.'
+change_summary: '1) Added a bullet establishing ''appearance'' (looks/color/style/aesthetics) as a valid,
+  common, distinct facet -- addresses the largest single FN mass (18) which was previously undocumented
+  anywhere in the prompt. 2) Added a bullet distinguishing ''build quality'' (overall construction/craftsmanship)
+  from ''material quality'' (the raw material itself) and ''texture''/''softness'' (tactile feel only)
+  -- targets the build quality FN (15) vs material quality FP (9) / texture FP (8) renaming error visible
+  in the worst-scoring plush-toy/gift reviews. 3) Added a bullet distinguishing ''functionality'' (do
+  controls/mechanisms operate correctly) from ''effectiveness'' (does the product achieve its intended
+  result) and deprecating the vague facet ''performance'' -- targets functionality FN (12), effectiveness
+  FN (11), and the observed performance->functionality swap (FP 3). 4) Added two new synthetic few-shot
+  examples (max allowed this round): a backpack review grounding appearance/build quality/material quality
+  together, and an espresso-machine review grounding functionality/effectiveness together -- neither copies
+  any dev-set review. 5) Left the existing four few-shot examples and the size/sizing-accuracy/fit rule
+  text unchanged, since that area was already tested by gi2/gi3 without improving on v2''s score.'
+version: gi4
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - 'appearance' is a valid, common facet: how the product looks (color, style, aesthetics). Always name it separately from how well the product is built or what it's made of.
+  - Distinguish related but different quality dimensions: 'build quality' = overall construction/craftsmanship (well made, holds together, parts breaking or coming apart); 'material quality' = the raw material itself (fabric grade, plastic type), judged apart from how it's assembled; 'texture' or 'softness' = only how the product physically feels to the touch. A single review can carry more than one of these at once -- do not collapse them into one facet.
+  - Distinguish 'functionality' (do the product's controls, features, or mechanisms operate correctly) from 'effectiveness' (does the product actually achieve the result or purpose it's for). Avoid the vague facet 'performance' -- name the specific dimension instead.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This backpack looks fantastic - the color really pops and everyone compliments it - but after two weeks one of the zipper pulls snapped off and a side seam started coming apart. The canvas fabric itself still feels thick and sturdy though.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks fantastic - the color really pops
+    - facet: build quality
+      polarity: negative
+      evidence: a zipper pull snapped off and a side seam started coming apart
+    - facet: material quality
+      polarity: positive
+      evidence: canvas fabric itself still feels thick and sturdy
+- user: |-
+    The temperature dial on this espresso machine actually hits the number you set, no more guessing, and the milk frother works on the first try every time. More importantly, it brews strong, rich coffee that tastes just like the cafe down the street.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: temperature dial actually hits the number you set
+    - facet: effectiveness
+      polarity: positive
+      evidence: brews strong, rich coffee that tastes just like the cafe down the street

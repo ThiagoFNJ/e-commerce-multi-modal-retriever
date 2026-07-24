@@ -1,0 +1,222 @@
+parent: gb6
+created: '2026-07-23'
+status: candidate
+model: gemma4:12b-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Grounded in gb6''s own measured results (F1 0.5037, the best candidate so far), avoiding gb7''s
+  failed CONSOLIDATE-wording-only edit (F1 0.4816) by pairing rule changes with concrete evidence instead
+  of prose restatement alone. (1) The largest combined error mass in the aggregate stats is the effectiveness/functionality
+  pair: effectiveness is the top false-positive name (13) and functionality the top-but-one missed gold
+  name (11), with functionality also FP''d 7 times and effectiveness missed 3 times -- 34 combined errors,
+  larger than any single other name. Tracing this into gb6''s OWN few-shot examples found the likely root
+  cause: example 5 (blender) labels ''chops ice, purees soup, and crushes frozen fruit without any hiccups''
+  -- the blender fulfilling its core purpose -- as ''effectiveness'', while example 6 (drone) labels ''flies
+  exactly like it''s supposed to'' -- the drone fulfilling its core purpose, i.e. flying -- as ''functionality''.
+  These are structurally identical statements (core purpose being fulfilled) given opposite labels in
+  the model''s own worked examples, which plausibly teaches exactly the confusion the aggregate stats
+  show. Fixed by correcting the drone example to ''effectiveness'' for internal consistency, sharpening
+  rule 8''s definitions along an OPERATE-a-named-feature (functionality) vs PRODUCE-the-real-world-result
+  (effectiveness) axis, and adding one new worked example (air purifier) so a functionality case still
+  exists after the drone fix. (2) ''price'' (8 FP), ''value for money'' (6 FP), and ''customer service''
+  (4 FP) are still leaking despite the existing exclusion rule''s prose, and worst-review B07ZHYS7MD#6
+  (f1=0.0, a review gb2 and gb6 both already targeted) still outputs ''customer support'' and ''replacement
+  parts'' even though both concepts are already named in the exclusion rule''s text -- describing the
+  excluded CATEGORY isn''t stopping the literal banned NAME from being output, so this round adds a direct
+  list of forbidden facet strings. (3) The same review also outputs ''charging station'', and B07Y5WMGGG#12
+  (f1=0.0) outputs ''tool'' and ''bling'' -- all component/object nouns rather than quality dimensions,
+  a pattern the facet-definition rule doesn''t explicitly forbid (it only bans category and brand names);
+  added an explicit ban. (4) B01N2U5J5U#1 (f1=0.0) outputs ''build quality'' four times -- a literal duplicate
+  surviving gb6''s rescan instruction -- for three different parts (arms, legs, head) popping off, when
+  gold wants a single ''part fit'' facet, and separately misses gold ''stability'' (''doesn''t stand up
+  pretty well''). Added ''part fit'' and ''stability'' as named canonical terms, narrowed build quality''s
+  definition to whole-product construction so it stops absorbing individual-part failures, and reworded
+  the dedup rule as a hard invalid-answer constraint tied explicitly to this same part-fit consolidation
+  case (mirrors B08NV5452X#3''s ''fit'' x5 duplicate too). (5) Aggregate ''fit'' (10 FP, 7 missed) is
+  a real recurring gold term absent from the canonical bucket list, causing inconsistent use (B08NV5452X#3
+  uses ''fit'' where gold wants ''length''); folded it into the existing ''sizing accuracy'' definition
+  as an explicit synonym rather than adding a fourth overlapping bucket term, and distinguished it from
+  the new ''part fit'' term. No dev review text was copied into any example; the two example changes are
+  synthetic and mirror error structures only.'
+change_summary: '1. Facet-definition rule: added an explicit ban on naming a physical part/component/object
+  noun as the facet itself (e.g. ''charging station'', ''tool'', ''bling'') -- always name the quality
+  dimension of that part instead. Targets B07ZHYS7MD#6 (''charging station'') and B07Y5WMGGG#12 (''tool'',
+  ''bling'').
+
+  2. Product-intrinsic exclusion rule: added an explicit forbidden-facet-name list (''price'', ''cost'',
+  ''value'', ''value for money'', ''customer service'', ''customer support'', ''warranty'', ''replacement
+  parts'') since the prose category description alone wasn''t stopping these literal names from being
+  output. Targets aggregate FPs ''price'' (8), ''value for money'' (6), ''customer service'' (4), and
+  B07ZHYS7MD#6 (''customer support'', ''replacement parts'' still leaking).
+
+  3. Specific-dimension rule: rewrote the effectiveness/functionality definitions onto an OPERATE-a-named-feature
+  (functionality) vs PRODUCE-the-real-world-result (effectiveness) axis, replacing the old core-purpose-based
+  definitions that gb6''s own examples (blender vs drone) applied inconsistently. Targets the single largest
+  combined error mass in the aggregate stats: effectiveness (13 FP, 3 FN) + functionality (7 FP, 11 FN)
+  = 34.
+
+  4. Specific-dimension rule: added ''part fit'' (components detaching/not staying attached) and ''stability''
+  (staying upright/balanced) as named canonical terms; narrowed ''build quality'' to whole-product construction
+  so it no longer absorbs individual-part failures. Targets B01N2U5J5U#1 (build quality x4 for three separate
+  parts falling off, missing gold ''part fit'' and ''stability'').
+
+  5. Specific-dimension rule: folded ''fit'' into the ''sizing accuracy'' definition as an explicit synonym,
+  distinguished from the new ''part fit'' term. Targets aggregate ''fit'' (10 FP, 7 missed) and B08NV5452X#3
+  (repeated ''fit''/''fit relative to size'' used where gold wants ''length'').
+
+  6. Dedup rule: reworded from a process reminder into a hard invalid-answer constraint, explicitly tied
+  to the part-fit consolidation case. Targets B01N2U5J5U#1 (''build quality'' x4) and B08NV5452X#3 (''fit''
+  x5), both literal duplicates surviving gb6''s existing rescan instruction.
+
+  7. Modified few-shot example 6 (drone, existing): changed the ''flies exactly like it''s supposed to''
+  facet from ''functionality'' to ''effectiveness'' for internal consistency with example 5 (blender)
+  and with the new rule-8 definitions -- this line was the likely source of the effectiveness/functionality
+  confusion.
+
+  8. Added few-shot example 11 (air purifier, synthetic): demonstrates effectiveness (core-purpose result:
+  smell removal) and functionality (named feature: auto mode) as distinct facets in the same review, giving
+  a clean functionality anchor now that example 6 no longer supplies one.'
+version: gb8
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'build quality', 'sizing accuracy', 'ease of use'. Never name a physical part, component, or generic object noun as the facet itself (not 'charging station', 'tool', 'clip', 'bling') -- always name the QUALITY of that part instead ('reliability', 'functionality', 'appearance', 'included accessories').
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and anything about buying or owning the product rather than the product itself. Specifically exclude: the price paid, value for money, cost, and whether it's "worth it" or a "reasonable price"; listing/description accuracy; and customer service in any form -- support responsiveness, replacement-parts availability, warranty handling, how fast or slow the seller/manufacturer replied. Never output a facet literally named 'price', 'cost', 'value', 'value for money', 'customer service', 'customer support', 'warranty', or 'replacement parts' -- these are always excluded regardless of how the sentence is framed. If a sentence mixes a real product complaint with a service/support complaint (e.g. "the charger stopped working and support never replied"), extract only the product part. The RELATIVE LENGTH of a complaint does not decide what to extract: a single short clause naming a genuine product detail is still extractable even if it's buried inside a much longer listing/seller/shipping/service complaint, and a long service or support complaint is still fully excluded even if it dominates the review -- judge each clause by what it's about, not by how much of the review it takes up.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names; never a named character, person, actor, or title -- for books, movies, and other creative works, name the CRAFT dimension being judged instead: 'plot', 'characters', 'writing quality', 'content quality', 'pacing', 'engagement' (how compelling or hard to put down it is), 'emotional impact' (how moving or affecting it is), 'humor' (how funny it is), 'video quality', 'audio quality' -- never the character's, author's, or performer's name.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - CONSOLIDATE: if several sentences all describe the same underlying dimension (e.g. multiple specific examples of the product working, or not working, as intended, or several different parts each failing the same way), report ONE facet for that dimension, not one per example or per part. Most reviews need only 1-3 facets; use more only when the review clearly discusses several distinct dimensions.
+  - Name the SPECIFIC dimension the review is actually about -- 'installation', 'assembly', 'adjustability', 'cord length', 'cup size', 'subtitles', 'ingredient transparency', 'included accessories', 'part fit', 'stability' are all better facets than a vague bucket term when the review is clearly about that specific thing. Only fall back to one of these broad names when the review is genuinely about the general quality and no more specific name fits: functionality (whether the product's mechanisms, controls, or features OPERATE as intended -- turns on, connects, pairs, flies, adjusts, responds to input -- regardless of the end-result benefit, e.g. "flies exactly like it's supposed to", "the auto-shutoff never triggers"), effectiveness (whether using the product actually PRODUCES the intended real-world result or benefit -- e.g. "actually removes the stains", "the weeds died", "my skin cleared up" -- the outcome achieved by the product's core purpose, not just whether a mechanism ran), reliability (does it keep working, without failing or breaking down, across repeated use), build quality (construction, sturdiness -- including a ONE-TIME breakage, crack, or falling apart of the product AS A WHOLE, e.g. "fell apart as I unpacked it"; if instead individual PARTS detach, pop off, or don't stay attached -- an arm, a leg, a strap, a cover -- use 'part fit' instead, even if this happens to several different parts, and even then report it as ONE 'part fit' facet, not one per part), durability (holds up over an EXTENDED period of repeated wear or use -- only use this when the review itself frames it that way, e.g. "after six months of daily use"; a single immediate failure is build quality, not durability), stability (whether the product stays upright, balanced, or steady during use), appearance (look, style, design, color, finish -- these are all the same dimension; any visual/cosmetic remark, even a brief aside like "it was pretty" or "looks like quality", is appearance and must not be dropped from the output just because another facet in the same review seems more substantial), size (actual physical dimensions), sizing accuracy (fit relative to the size ordered -- also covers a garment, cover, or case being called too big/small/tight/loose, including when the review just says "fit" or "fits"; keep this distinct from 'part fit', which is about a product's own components attaching to each other, not about the size ordered), ease of use (day-to-day operation, not a one-time setup step like installation or assembly), material, comfort.
+  - Deduplicate facets: the facet list you return must never contain the same facet name twice -- not even for emphasis, and even when several sentences describe separate instances of the same kind of problem (e.g. an arm falling off, then a leg falling off, then a head falling off are all ONE 'part fit' mention, not three, see CONSOLIDATE). An output containing a repeated facet name is invalid; before returning, re-scan the facet list you are about to output and merge or remove every repeat -- this check is mandatory even when you're confident you already deduplicated while composing. At most 6 facets, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender chops ice, purees soup, and crushes frozen fruit without any hiccups - it just works every time. It feels solid and heavy, not flimsy at all, and looks sleek on the counter in brushed steel. It came with two extra jars and a recipe booklet, which was a nice surprise. A bit pricey, but worth it for how well it's built.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: chops ice, purees soup, and crushes frozen fruit without any hiccups
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and heavy, not flimsy at all
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter in brushed steel
+    - facet: included accessories
+      polarity: positive
+      evidence: came with two extra jars and a recipe booklet
+- user: |-
+    This drone flies exactly like it's supposed to and hasn't glitched once in three months of daily use. It's way bigger than I expected, taking up my whole shelf. The matte black finish looks cheap, and one of the propellers cracked after a light bump. When I emailed about the crack, support took two weeks to reply and never sent a replacement.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: flies exactly like it's supposed to
+    - facet: reliability
+      polarity: positive
+      evidence: hasn't glitched once in three months of daily use
+    - facet: size
+      polarity: neutral
+      evidence: way bigger than I expected, taking up my whole shelf
+    - facet: appearance
+      polarity: negative
+      evidence: matte black finish looks cheap
+    - facet: build quality
+      polarity: negative
+      evidence: one of the propellers cracked after a light bump
+- user: |-
+    This mystery kept me flipping pages until 2am - the twists are clever and never cheap. The detective is stubborn and funny in a way that feels real, and by the ending I actually cared what happened to her. My only complaint is the prose gets clunky in the middle third, some sentences you have to reread twice.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: the twists are clever and never cheap
+    - facet: characters
+      polarity: positive
+      evidence: The detective is stubborn and funny in a way that feels real
+    - facet: writing quality
+      polarity: negative
+      evidence: the prose gets clunky in the middle third
+- user: |-
+    The frame went together in about ten minutes, no tools missing and the instructions were clear. Once assembled it's sturdy and doesn't wobble at all. I did email about a missing bolt and it took three weeks and two follow-ups to get a response, which was annoying.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: The frame went together in about ten minutes, no tools missing and the instructions were
+        clear
+    - facet: build quality
+      polarity: positive
+      evidence: it's sturdy and doesn't wobble at all
+- user: |-
+    I devoured this memoir in two nights, could not put it down. The chapter about her college roommate had me laughing so hard I read it out loud to my husband twice. By the final chapters I was properly crying though, that ending really got me. The author's voice is warm and easy to read too.
+  assistant:
+    aspects:
+    - facet: engagement
+      polarity: positive
+      evidence: devoured this memoir in two nights, could not put it down
+    - facet: humor
+      polarity: positive
+      evidence: had me laughing so hard I read it out loud to my husband twice
+    - facet: emotional impact
+      polarity: positive
+      evidence: I was properly crying though, that ending really got me
+    - facet: writing quality
+      polarity: positive
+      evidence: author's voice is warm and easy to read
+- user: |-
+    Really disappointed with this whole order. The listing says it comes in a set of 4 but I only received 2, and when I emailed the seller about it they took a week to even respond. On top of that it arrived two days late. The one thing that did work out is the clip itself - it snaps on tight and hasn't slipped once.
+  assistant:
+    aspects:
+    - facet: clip strength
+      polarity: positive
+      evidence: it snaps on tight and hasn't slipped once
+- user: |-
+    This air purifier actually gets rid of the cooking smells in my kitchen within about an hour, which is exactly why I bought it. The auto mode is supposed to ramp the fan up on its own whenever it senses smoke, but it just never kicks in - I have to switch it to high manually every single time.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: actually gets rid of the cooking smells in my kitchen within about an hour
+    - facet: functionality
+      polarity: negative
+      evidence: the auto mode ... never kicks in

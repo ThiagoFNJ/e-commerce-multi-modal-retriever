@@ -1,0 +1,134 @@
+parent: gi5
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The evidence shows the gi5 rename (''sizing accuracy''->''size'' everywhere) did not fix the top
+  facet-naming mismatch, it just flipped it and made it slightly larger: pre-rename (v2, as reported in
+  gi5''s own request) the split was FP ''sizing accuracy''=9 / FN ''size''=10 (19 total mismatched instances);
+  post-rename (this gi5 candidate''s measured results) it is now FP ''size''=12 / FN ''sizing accuracy''=9
+  (21 total) -- still the single largest FP mass in the whole report. Under the stated semantic-matching
+  rule, ''size'' and ''sizing accuracy'' evidently sit below the 0.80 cosine threshold (otherwise they
+  would already match and neither would appear in these lists), so merging the two into one facet name
+  cannot close this gap -- it can only choose which side of the gap the errors land on. The worst-review
+  evidence explains why a merge is the wrong lever: gold uses ''sizing accuracy'' specifically for apparel/fit-to-expectation
+  reviews (''runs small, order a size up'' -- the few-shot #3 scenario), and ''sizing accuracy'' remains
+  the 2nd-largest FN mass overall (9) even after the rename, while a separate, smaller FN mass literally
+  named ''size'' (4) persists for non-apparel physical-dimension complaints (e.g. B07RYK3J41#6, a Raspberry
+  Pi case ''almost too big'', gold=''size'', pred=''fit''/''compatibility'' -- not an apparel scenario
+  at all). These are two distinct gold concepts that a single merged term cannot serve. Edit 1 reverses
+  the merge in system rule 1''s illustrative list, rule 2''s worked example, and few-shot #3 back to ''sizing
+  accuracy'' for the apparel/fit scenario (keeping the demonstration and rules mutually consistent, the
+  fix that made gi5 beat gi3), while leaving ''size'' available (undocumented in rule 1''s short illustrative
+  list, same pattern already used successfully for ''appearance''/''build quality''/''effectiveness''
+  in gi5) for the literal-dimension sense taught only via a new example. Edit 2 adds one synthetic 6th
+  few-shot example (a blender review, no dev text copied) that demonstrates four currently-undertaught
+  facets in one shot: ''size'' in its literal, non-apparel sense (disambiguating it from ''sizing accuracy'',
+  FN size=4), ''included accessories'' (FN=7, never demonstrated), ''functionality'' (FN=11, the single
+  largest still-untaught FN mass -- distinct from the already-demonstrated ''effectiveness'', meaning
+  ''does the mechanism operate as designed'' rather than ''does it sufficiently achieve its purpose''),
+  and ''reliability'' (FN=6, also never demonstrated). Reliability and functionality demonstrations are
+  also expected to reduce the top FP mass ''durability''=12, since the worst-review evidence shows this
+  model currently uses ''durability'' as a catch-all substitute exactly where gold wants ''reliability''
+  (B07X4VJSNC#6: gold ''reliability: negative'', pred ''durability: negative'', for a heat press that
+  simply stopped working) or ''build quality'' (B00IN9W73S#5: gold ''build quality: negative'', pred ''durability:
+  negative'', for something that fell apart immediately out of the package) -- giving the model a positive
+  demonstration of the correct term is the lever that worked for appearance/build quality/effectiveness
+  in gi5, and is used again here rather than a new rule bullet, since rule-bullet facet-distinction edits
+  (gi1, gi4) have twice reduced F1 below baseline. Both edits are renaming/additive only, keep the prompt
+  well under double its current length, and add no new rule bullets.'
+change_summary: '1) Reversed the ''sizing accuracy''->''size'' merge for the apparel/fit-to-expectation
+  sense: rule 1''s illustrative facet list, rule 2''s worked example, and few-shot #3 (''Runs small, order
+  a size up'') all now say ''sizing accuracy'' again -- the gi5 merge flipped but did not shrink the top
+  naming mismatch (FP ''sizing accuracy''=9/FN ''size''=10 pre-rename -> FP ''size''=12/FN ''sizing accuracy''=9
+  post-rename, 19 -> 21 total mismatched instances), showing these are two distinct gold concepts (apparel
+  fit vs. literal dimension) that cannot be served by one merged name; the literal-dimension sense of
+  ''size'' is now taught only via the new example below, matching the existing pattern for ''appearance''/''build
+  quality''/''effectiveness''. 2) Added a new synthetic 6th few-shot example (blender review; not copied
+  from any dev review) demonstrating ''included accessories'' (FN=7, previously undemonstrated), ''size''
+  in its literal/physical sense (FN=4, disambiguated from ''sizing accuracy''), ''functionality'' (FN=11,
+  the largest still-untaught FN mass, distinct from the already-demonstrated ''effectiveness''), and ''reliability''
+  (FN=6, previously undemonstrated and the facet the model substitutes with the overused ''durability'',
+  FP=12, in worst-review cases like B07X4VJSNC#6) -- taught via example rather than a new rule bullet,
+  consistent with the pattern that worked in gi5 and avoiding the rule-bullet pattern that failed twice
+  (gi1, gi4).'
+version: gi6
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for
+- user: |-
+    This blender arrived with a recipe booklet and an extra blending cup I wasn't expecting, which was a nice bonus. It's noticeably smaller than it looked in the photos, so it barely fits under my cabinets. That said, it works exactly as advertised, crushing ice smoothly every time, and six months of daily smoothies in, it hasn't slowed down at all.
+  assistant:
+    aspects:
+    - facet: included accessories
+      polarity: positive
+      evidence: arrived with a recipe booklet and an extra blending cup I wasn't expecting
+    - facet: size
+      polarity: negative
+      evidence: noticeably smaller than it looked in the photos, so it barely fits under my cabinets
+    - facet: functionality
+      polarity: positive
+      evidence: works exactly as advertised, crushing ice smoothly every time
+    - facet: reliability
+      polarity: positive
+      evidence: six months of daily smoothies in, it hasn't slowed down at all

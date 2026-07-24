@@ -1,0 +1,156 @@
+parent: v2
+created: '2026-07-23'
+status: candidate
+model: gemma4:12b-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The dominant error mass is overgeneration paired with facet-naming drift from the gold vocabulary,
+  not missing coverage of new topics. In the worst-scoring reviews the model routinely splits ONE underlying
+  dimension into 3-6 narrow, invented facets (e.g. ''leg health, niacin content, convenience, powdered
+  form, human consumption, overall satisfaction'' for a review whose gold label is just ''effectiveness,
+  texture''; ''pain relief, spine alignment, muscle tension, convenience, price'' for gold ''effectiveness'').
+  This directly explains the low precision (0.41) despite decent recall (0.52): each split produces a
+  false positive and, because the split names rarely land within 0.80 cosine of the gold facet, also a
+  missed gold facet. The single largest aligned pair in the aggregate stats is FP ''durability'' (20)
+  against missed gold ''build quality'' (19) -- essentially the same content under the wrong name -- so
+  renaming that one dimension is the highest-leverage single edit available. The next largest masses are:
+  ''appearance'' missed 22 times, meaning the model frequently fails to recognize look/finish/color/style
+  content as a facet at all (three of the worst reviews have appearance as a missed gold facet the model
+  didn''t produce anything for); ''effectiveness'' (12) and ''functionality'' (11) missed because the
+  model prefers narrower invented names like ''pain relief'', ''scalp massage'', ''niacin content'', ''cleaning
+  power'' instead of the canonical broader term; ''included accessories''/''included parts'' missed 10
+  times combined, a category the model doesn''t seem to recognize as a valid dimension at all; and price/value
+  FPs (''price'' 13, ''value for money'' 7, ''value'' 4 = 24 combined) despite the existing price-exclusion
+  rule, showing the rule needs to explicitly name ''value for money'' and cost judgments, not just ''the
+  price paid''. ''customer service'' FPs (5) persist despite an existing exclusion rule -- one worst review
+  shows the model producing ''customer support'' as a facet right next to a correctly-scoped ''charging
+  station'' complaint, so the exclusion needs reinforcement via a worked example rather than rule text
+  alone, since rule text alone already failed to suppress it. Finally, ''sizing accuracy'' is being over-applied
+  to absolute-dimension complaints (''HUGE and not so cute'', gold facet ''size'') -- the one existing
+  few-shot example for sizing only demonstrates the fit-relative-to-ordered-size sense, so the model has
+  no signal that plain physical size is a separate facet. I added a consolidation rule, a canonical-dimension-name
+  list built directly from the gold vocabulary observed in the missed-facet stats (build quality, effectiveness,
+  functionality, reliability, appearance, size vs sizing accuracy, included accessories), tightened the
+  exclusion rule to name value-for-money and listing/description accuracy explicitly, and replaced ''battery
+  life'' in the rule-1 example list (a facet with 6 pure FPs and no domain relevance to most reviews)
+  with ''ease of use'', which is under-produced (missed 3) and on the canonical list. Two new synthetic
+  few-shot examples were added, each targeting several of these masses at once and modeled directly on
+  the failure patterns observed (not copied from any dev review): one demonstrates consolidating multiple
+  specific working-examples into a single ''effectiveness'' facet, plus ''build quality'', ''appearance'',
+  and ''included accessories'', with a price mention deliberately present but excluded; the other demonstrates
+  ''functionality'' vs ''reliability'' as distinct facets, ''size'' as the absolute-dimension sense, ''build
+  quality'' for a physical defect, and a customer-support complaint present in the text but deliberately
+  excluded, mirroring the B07ZHYS7MD#6 failure almost exactly.'
+change_summary: '1. Rule 1 (facet definition) examples: replaced ''battery life'' (pure FP magnet, 6 FPs,
+  no recall benefit) with ''ease of use'' (missed 3 times, on the canonical list).
+
+  2. Product-intrinsic exclusion rule: added ''value for money'' and ''listing/description accuracy''
+  as explicit exclusions alongside the existing price/delivery/customer-service exclusions (price+value
+  FPs = 24 combined in aggregate stats).
+
+  3. Added a new CONSOLIDATE rule: report one facet per underlying dimension even when the review gives
+  several specific examples of it, and default to 1-3 facets per review unless clearly multi-dimensional
+  -- targets the overgeneration seen in nearly every worst-scoring review (e.g. 6 predicted facets vs
+  2 gold facets).
+
+  4. Added a canonical-dimension-name list (effectiveness, functionality, reliability, build quality,
+  appearance, size, sizing accuracy, ease of use, included accessories, material, comfort) with short
+  definitions disambiguating the close pairs that are causing near-miss failures under the 0.80 semantic-match
+  threshold: build quality vs durability (FP 20 / missed 19), functionality vs performance/versatility,
+  effectiveness vs narrow invented facets, size (absolute) vs sizing accuracy (fit-relative-to-ordered-size).
+
+  5. Added few-shot example 5 (blender, synthetic): demonstrates consolidating multiple working-examples
+  into one ''effectiveness'' facet, plus ''build quality'', ''appearance'', ''included accessories'',
+  and a price mention present but correctly excluded.
+
+  6. Added few-shot example 6 (drone, synthetic): demonstrates ''functionality'' vs ''reliability'' as
+  distinct facets, ''size'' in the absolute-dimension sense, a physical defect scored as ''build quality'',
+  and a customer-support complaint present in the text but correctly excluded -- directly mirrors the
+  B07ZHYS7MD#6 failure pattern (charging-station reliability issue conflated with a customer-support facet).'
+version: gb1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'build quality', 'sizing accuracy', 'ease of use'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, value for money, listing/description accuracy, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - CONSOLIDATE: if several sentences all describe the same underlying dimension (e.g. multiple specific examples of the product working, or not working, as intended), report ONE facet for that dimension, not one per example. Most reviews need only 1-3 facets; use more only when the review clearly discusses several distinct dimensions.
+  - Prefer these broad, common dimension names over narrow or invented ones, matching the review's meaning to the closest one: effectiveness (does it achieve its core purpose), functionality (do its features work as intended), reliability (does it keep working over time / hold up to repeated use), build quality (construction, sturdiness, materials holding up -- not 'durability'), appearance (look, style, color, finish), size (actual physical dimensions), sizing accuracy (fit relative to the size ordered), ease of use, included accessories (extra items that come with the product), material, comfort. Only invent a more specific facet name when none of these fit.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender chops ice, purees soup, and crushes frozen fruit without any hiccups - it just works every time. It feels solid and heavy, not flimsy at all, and looks sleek on the counter in brushed steel. It came with two extra jars and a recipe booklet, which was a nice surprise. A bit pricey, but worth it for how well it's built.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: chops ice, purees soup, and crushes frozen fruit without any hiccups
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and heavy, not flimsy at all
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter in brushed steel
+    - facet: included accessories
+      polarity: positive
+      evidence: came with two extra jars and a recipe booklet
+- user: |-
+    This drone flies exactly like it's supposed to and hasn't glitched once in three months of daily use. It's way bigger than I expected, taking up my whole shelf. The matte black finish looks cheap, and one of the propellers cracked after a light bump. When I emailed about the crack, support took two weeks to reply and never sent a replacement.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: flies exactly like it's supposed to
+    - facet: reliability
+      polarity: positive
+      evidence: hasn't glitched once in three months of daily use
+    - facet: size
+      polarity: neutral
+      evidence: way bigger than I expected, taking up my whole shelf
+    - facet: appearance
+      polarity: negative
+      evidence: matte black finish looks cheap
+    - facet: build quality
+      polarity: negative
+      evidence: one of the propellers cracked after a light bump
