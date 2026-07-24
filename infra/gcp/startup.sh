@@ -9,7 +9,7 @@ BUCKET="gs://emmr-9122a143"
 WORKDIR=/opt/emmr
 REPO=https://github.com/ThiagoFNJ/e-commerce-multi-modal-retriever.git
 BRANCH=feat/review-aspect-mining
-MODEL=google/gemma-4-12B
+MODEL=google/gemma-4-12B-it
 
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
@@ -38,7 +38,7 @@ gsutil -q cp "$BUCKET/ckpt/review_aspects.jsonl" ckpt/review_aspects.jsonl 2>/de
 echo "checkpoint lines at boot: $(wc -l < ckpt/review_aspects.jsonl 2>/dev/null || echo 0)"
 
 # --- model weights (cached on the boot disk across restarts of the same VM) ---
-$PY -c 'from huggingface_hub import snapshot_download; snapshot_download("google/gemma-4-12B")'
+$PY -c 'from huggingface_hub import snapshot_download; snapshot_download("google/gemma-4-12B-it")'
 
 # --- services ---
 cp "$WORKDIR"/repo/infra/gcp/vllm.service /etc/systemd/system/
