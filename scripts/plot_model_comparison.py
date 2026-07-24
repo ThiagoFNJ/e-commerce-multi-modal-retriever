@@ -29,6 +29,7 @@ SERIES = {
     "llama3.1:8b": "#eda100",
     "gemma4 base BF16 (ablation)": "#1baf7a",
     "gemma4-it BF16/vLLM": "#eb6834",
+    "qwen3:14b BF16/vLLM": "#8859d4",
 }
 HAIKU_F1 = 0.5767
 
@@ -51,6 +52,7 @@ series = {
     "llama3.1:8b": [("v2-llama31", by_tag["v2-llama31"])],
     "gemma4 base BF16 (ablation)": ([("v2-gemma4bf16", by_tag["v2-gemma4bf16"])] if "v2-gemma4bf16" in by_tag else []) + rounds("gb"),
     "gemma4-it BF16/vLLM": ([("v2-gemma4itbf16", by_tag["v2-gemma4itbf16"])] if "v2-gemma4itbf16" in by_tag else []) + rounds("gi"),
+    "qwen3:14b BF16/vLLM": ([("v2-qwen14bf16", by_tag["v2-qwen14bf16"])] if "v2-qwen14bf16" in by_tag else []) + rounds("qb"),
 }
 series = {k: v for k, v in series.items() if v}
 
