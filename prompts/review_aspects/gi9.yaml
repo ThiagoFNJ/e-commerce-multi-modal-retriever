@@ -1,0 +1,193 @@
+parent: gi8
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two clean gaps stand out this round, both fitting the lineage''s proven pattern (gi5-gi8): add
+  exactly one new demonstration for a facet the model already reaches for but has never been shown, rather
+  than touching rule bullets (failed twice, gi1/gi4) or re-editing the sizing-accuracy/size split (still
+  only one confirming instance, still too risky per gi8''s reasoning) or the air-purifier/shirt-sizing
+  examples just added last round. First: ''durability'' is now the single largest false-positive mass
+  in the whole report (FP=14, larger than last round''s top mass of 12), and it has zero demonstrations
+  anywhere in the prompt despite being the model''s default catch-all whenever something physically robust
+  is discussed -- confirmed by B07FTS5166#6 (''this leash can handle him'' with a 100lb dog -> gold strength;
+  pred durability), where the model reached for the undemonstrated-but-familiar ''durability'' instead
+  of the correct dimension. Edit 1 adds a synthetic tow-strap example contrasting ''strength'' (can it
+  handle a heavy load right now) against ''durability'' (does it hold up over repeated long-term use without
+  wearing out) in the same review, giving ''durability'' its first-ever correct demonstration and a precise
+  boundary against the load-bearing sense the model keeps misnaming. Second: three of the twenty worst-scoring
+  reviews this round are book reviews that predicted an empty list against 2-3 gold aspects each -- B09431D2DX#3
+  (gold plot/characters/writing quality, pred none), B07XB3H7HM#2 (gold humor/characters, pred none),
+  B00JNQKR8C#9 (gold engagement/entertainement, pred none) -- and ''plot'' and ''characters'' both appear
+  twice in the missed-gold-facet list despite the small fraction of book reviews in the set, meaning the
+  model is functionally blind to an entire product category: every one of the 9 current few-shot examples
+  is a physical object (boots, blender, lamp, shirt, air purifier, stuffed elephant, etc.), so the model
+  has no precedent that narrative/creative-work dimensions count as facets at all. Edit 2 adds a synthetic
+  mystery-novel example demonstrating ''plot'' (positive) and ''characters'' (positive) against ''writing
+  quality'' (negative) in one review, directly matching the gold vocabulary from the confirming reviews
+  (legitimate per the semantic-matching note) without copying any review text. I deliberately do not add
+  a third functionality/effectiveness demo even though functionality FN rose slightly (9->10) after gi8''s
+  dedicated air-purifier example: two targeted demos (blender, air purifier) already exist for that concept
+  and barely moved the number, while the confirming failures this round (B08NHPQMY5#6 -> ''massage performance'',
+  B089K66GRZ#5 -> ''organization'') show the model inventing bespoke, product-category-specific substitutes
+  rather than lacking a general demonstration -- a different failure mode than the ''never demonstrated
+  anywhere'' pattern that made softness, fit, and (partially) this round''s durability/book edits work,
+  and not fixable by one more generic demo. Both edits are pure additions (no rule bullets, no existing
+  examples touched), bring the few-shot count from 9 to 11, well under double the v2 baseline''s 7, and
+  use fully synthetic text.'
+change_summary: '1) Added a synthetic tow-strap few-shot example contrasting ''strength'' (positive: held
+  full towing load without stretching or snapping) against ''durability'' (negative: webbing fraying and
+  a stitched loop pulling apart after a summer of use) in the same review -- targets the single largest
+  FP mass in the report (durability=14), which has never been demonstrated as a correct facet anywhere
+  in the prompt, confirmed by B07FTS5166#6 where a leash''s load-bearing capacity (gold strength) was
+  mispredicted as durability. 2) Added a synthetic mystery-novel few-shot example demonstrating ''plot''
+  (positive) and ''characters'' (positive) against ''writing quality'' (negative) -- targets a fully undemonstrated
+  product domain (books/media), confirmed by three of the twenty worst-scoring reviews this round (B09431D2DX#3,
+  B07XB3H7HM#2, B00JNQKR8C#9) that predicted an empty list against 2-3 gold narrative-dimension aspects
+  each, because all 9 existing examples are physical-object reviews. Left the size/sizing-accuracy boundary,
+  the rule bullets, and the just-added air-purifier/shirt-sizing examples untouched; did not add a third
+  functionality/effectiveness demo since two prior dedicated demos left functionality FN essentially flat
+  (9->10), pointing to bespoke per-category term invention rather than a missing-demonstration gap. Both
+  changes are additive only, few-shot count grows from 9 to 11, no dev review text copied.'
+version: gi9
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: build quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for
+- user: |-
+    This blender arrived with a recipe booklet and an extra blending cup I wasn't expecting, which was a nice bonus. It's noticeably smaller than it looked in the photos, so it barely fits under my cabinets. That said, it works exactly as advertised, crushing ice smoothly every time, and six months of daily smoothies in, it hasn't slowed down at all.
+  assistant:
+    aspects:
+    - facet: included accessories
+      polarity: positive
+      evidence: arrived with a recipe booklet and an extra blending cup I wasn't expecting
+    - facet: size
+      polarity: negative
+      evidence: noticeably smaller than it looked in the photos, so it barely fits under my cabinets
+    - facet: functionality
+      polarity: positive
+      evidence: works exactly as advertised, crushing ice smoothly every time
+    - facet: reliability
+      polarity: positive
+      evidence: six months of daily smoothies in, it hasn't slowed down at all
+- user: |-
+    This stuffed elephant is unbelievably soft and plush, my daughter carries it everywhere and naps with it every day. After a year of daily hugs and two trips through the washing machine, the seams are still tight and none of the stitching has come loose - it's clearly well made.
+  assistant:
+    aspects:
+    - facet: softness
+      polarity: positive
+      evidence: unbelievably soft and plush
+    - facet: build quality
+      polarity: positive
+      evidence: the seams are still tight and none of the stitching has come loose - it's clearly well
+        made
+- user: |-
+    The size chart said medium would be true to size for my measurements, and it was - no need to size up or down. But once I put it on, the sleeves were fine while the waistband dug in and felt way too tight for how loose the rest of the shirt is.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: positive
+      evidence: The size chart said medium would be true to size for my measurements, and it was - no
+        need to size up or down
+    - facet: fit
+      polarity: negative
+      evidence: the waistband dug in and felt way too tight for how loose the rest of the shirt is
+- user: |-
+    This air purifier turns on right away and the fan runs smoothly through all three speed settings without any rattling. That said, after two weeks running it daily in my bedroom, the room still smells just as musty as before, so I don't think it's actually filtering much.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: turns on right away and the fan runs smoothly through all three speed settings without
+        any rattling
+    - facet: effectiveness
+      polarity: negative
+      evidence: the room still smells just as musty as before, so I don't think it's actually filtering
+        much
+- user: |-
+    This tow strap held our truck's full weight without stretching or snapping when we pulled a stuck car out of the mud - it did exactly what a strap this size should do. After a full summer of using it most weekends, though, the webbing is already fraying along both edges and one of the stitched loops has started to pull apart.
+  assistant:
+    aspects:
+    - facet: strength
+      polarity: positive
+      evidence: held our truck's full weight without stretching or snapping when we pulled a stuck car
+        out of the mud
+    - facet: durability
+      polarity: negative
+      evidence: the webbing is already fraying along both edges and one of the stitched loops has started
+        to pull apart
+- user: |-
+    This mystery kept me guessing until the final chapter - I suspected three different people and was wrong every time, which is exactly what I want from a thriller. The detective investigating the case is stubborn and flawed in a way that makes her feel like a real person rather than a stock character. My only complaint is that some of the dialogue felt stiff and over-explained, like the author didn't trust me to follow along.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the final chapter - I suspected three different people and was
+        wrong every time
+    - facet: characters
+      polarity: positive
+      evidence: The detective investigating the case is stubborn and flawed in a way that makes her feel
+        like a real person
+    - facet: writing quality
+      polarity: negative
+      evidence: some of the dialogue felt stiff and over-explained, like the author didn't trust me to
+        follow along

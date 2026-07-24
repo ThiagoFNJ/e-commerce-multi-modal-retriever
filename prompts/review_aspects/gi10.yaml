@@ -1,0 +1,206 @@
+parent: gi9
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two edits this round, both extending the exact pattern that worked in gi9 (fix an internal boundary/absence
+  rather than touch rule bullets, which failed twice at gi1/gi4). Edit 1: the single largest FP mass in
+  the whole report is now ''build quality'' (16, up from being unremarkable before), and the #1 worst-scoring
+  review (B00SSG8XDY#1, f1=0.0) shows exactly why -- gold ''durability: positive'' for a notebook''s protective
+  metal case surviving heavy daily use was predicted as ''build quality: positive''. Tracing the prompt,
+  this is a self-inflicted contradiction: the stuffed-elephant example still teaches that surviving ''a
+  year of daily hugs and two trips through the washing machine'' with no stitching failure is ''build
+  quality'', which is now the textbook definition of ''durability'' established by gi9''s own tow-strap
+  example (''holds up over repeated long-term use without wearing out''). The model has literally been
+  shown the same evidence pattern labeled two different ways in two different examples. Relabeling the
+  elephant''s second aspect to ''durability'' (same evidence, same polarity) removes the contradiction,
+  keeps build quality demonstrated twice elsewhere (Spanish review, desk lamp), and -- as a bonus -- gives
+  durability its first-ever POSITIVE demonstration (previously demonstrated only as negative via the tow
+  strap), which should help durability''s own FN mass (5) as well as bleed less into build quality. Edit
+  2: ''design'' shows a striking symmetric split (FP=5, FN=5) -- a strong signature of a pure naming/near-synonym
+  gap rather than a reasoning gap -- and is directly confirmed by worst-scoring review B07ZX3K9S4#4 (''Beautiful
+  design'' -> gold design, pred appearance). Plain ''color'' (FN=3, distinct from the already-demonstrated
+  ''color accuracy'' photo-mismatch sense) is confirmed by two more worst-20 reviews (B093Y8K7D8#7: ''Colorful
+  for summer and autumn decor'' -> gold color, pred appearance; B07RLZQ987#2: ''Faded yellow not bright
+  at all'' -> gold color, pred color accuracy). Neither ''design'' nor plain ''color'' has ever been demonstrated
+  anywhere in the prompt -- only ''appearance'' and ''color accuracy'' exist as visual-domain facets --
+  so the model has no precedent that these are legitimate, separate dimensions, and defaults to the catch-all
+  it knows (appearance), the same undemonstrated-facet failure shape that made durability and books work
+  last round. Edit 2 adds one synthetic sunglasses example isolating ''design'' and ''color'' with vocabulary-aligned
+  evidence, without touching appearance or color accuracy. I deliberately did NOT touch the size/sizing-accuracy/fit/length
+  cluster again this round: three worst-20 reviews do implicate it (B08NV5452X#3, B07VC791X3#3, B01BI85NTA#7),
+  but unlike the two edits above, those three each point to a DIFFERENT correct gold facet (length, size,
+  fit respectively) all being collapsed into ''sizing accuracy'' -- a three-or-four-way disambiguation,
+  not a clean pairwise contrast, and exactly the shape of complexity that killed the rule-block attempts
+  at gi1/gi4. Per gi8/gi9''s own reasoning this area is still flagged risky; a future round should revisit
+  it once one sub-pattern (e.g. size specifically, or length specifically) clearly dominates rather than
+  three scattered singleton failures.'
+change_summary: '1) Relabeled the stuffed-elephant few-shot example''s second aspect from ''build quality''
+  to ''durability'' (same evidence ''the seams are still tight and none of the stitching has come loose...
+  after a year of daily hugs and two trips through the washing machine'', same positive polarity) -- resolves
+  a direct contradiction with gi9''s own tow-strap durability definition, targets the single largest FP
+  mass in the report (build quality=16), confirmed by the #1 worst-scoring review B00SSG8XDY#1 (gold durability,
+  pred build quality), and gives durability its first positive-polarity demonstration. 2) Added a new
+  synthetic sunglasses few-shot example demonstrating ''design'' (positive: ''a sleek cat-eye design that
+  gets compliments every time I wear them'') and ''color'' (positive: ''the tortoiseshell color is rich
+  and warm, definitely a statement piece on its own'') as facets distinct from the already-demonstrated
+  ''appearance'' and ''color accuracy'' -- targets design''s symmetric FP=5/FN=5 mass and color''s FN=3
+  mass, confirmed by three worst-20 reviews (B07ZX3K9S4#4, B093Y8K7D8#7, B07RLZQ987#2) where the model
+  substituted ''appearance'' or ''color accuracy'' for gold''s ''design''/''color'' because neither has
+  ever been shown as a standalone facet. Left all rule bullets untouched (rule edits failed twice at gi1/gi4),
+  left the size/sizing-accuracy/fit/length cluster untouched despite three confirming worst-20 instances
+  because they implicate three different correct facets rather than one clean contrast, and left the tow-strap/book/air-purifier
+  examples untouched. Few-shot count grows from 11 to 12, well under double the v2 baseline''s 7. No dev
+  review text copied; both edits fully synthetic.'
+version: gi10
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: build quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for
+- user: |-
+    This blender arrived with a recipe booklet and an extra blending cup I wasn't expecting, which was a nice bonus. It's noticeably smaller than it looked in the photos, so it barely fits under my cabinets. That said, it works exactly as advertised, crushing ice smoothly every time, and six months of daily smoothies in, it hasn't slowed down at all.
+  assistant:
+    aspects:
+    - facet: included accessories
+      polarity: positive
+      evidence: arrived with a recipe booklet and an extra blending cup I wasn't expecting
+    - facet: size
+      polarity: negative
+      evidence: noticeably smaller than it looked in the photos, so it barely fits under my cabinets
+    - facet: functionality
+      polarity: positive
+      evidence: works exactly as advertised, crushing ice smoothly every time
+    - facet: reliability
+      polarity: positive
+      evidence: six months of daily smoothies in, it hasn't slowed down at all
+- user: |-
+    This stuffed elephant is unbelievably soft and plush, my daughter carries it everywhere and naps with it every day. After a year of daily hugs and two trips through the washing machine, the seams are still tight and none of the stitching has come loose - it's clearly well made.
+  assistant:
+    aspects:
+    - facet: softness
+      polarity: positive
+      evidence: unbelievably soft and plush
+    - facet: durability
+      polarity: positive
+      evidence: After a year of daily hugs and two trips through the washing machine, the seams are still
+        tight and none of the stitching has come loose - it's clearly well made
+- user: |-
+    The size chart said medium would be true to size for my measurements, and it was - no need to size up or down. But once I put it on, the sleeves were fine while the waistband dug in and felt way too tight for how loose the rest of the shirt is.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: positive
+      evidence: The size chart said medium would be true to size for my measurements, and it was - no
+        need to size up or down
+    - facet: fit
+      polarity: negative
+      evidence: the waistband dug in and felt way too tight for how loose the rest of the shirt is
+- user: |-
+    This air purifier turns on right away and the fan runs smoothly through all three speed settings without any rattling. That said, after two weeks running it daily in my bedroom, the room still smells just as musty as before, so I don't think it's actually filtering much.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: turns on right away and the fan runs smoothly through all three speed settings without
+        any rattling
+    - facet: effectiveness
+      polarity: negative
+      evidence: the room still smells just as musty as before, so I don't think it's actually filtering
+        much
+- user: |-
+    This tow strap held our truck's full weight without stretching or snapping when we pulled a stuck car out of the mud - it did exactly what a strap this size should do. After a full summer of using it most weekends, though, the webbing is already fraying along both edges and one of the stitched loops has started to pull apart.
+  assistant:
+    aspects:
+    - facet: strength
+      polarity: positive
+      evidence: held our truck's full weight without stretching or snapping when we pulled a stuck car
+        out of the mud
+    - facet: durability
+      polarity: negative
+      evidence: the webbing is already fraying along both edges and one of the stitched loops has started
+        to pull apart
+- user: |-
+    This mystery kept me guessing until the final chapter - I suspected three different people and was wrong every time, which is exactly what I want from a thriller. The detective investigating the case is stubborn and flawed in a way that makes her feel like a real person rather than a stock character. My only complaint is that some of the dialogue felt stiff and over-explained, like the author didn't trust me to follow along.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the final chapter - I suspected three different people and was
+        wrong every time
+    - facet: characters
+      polarity: positive
+      evidence: The detective investigating the case is stubborn and flawed in a way that makes her feel
+        like a real person
+    - facet: writing quality
+      polarity: negative
+      evidence: some of the dialogue felt stiff and over-explained, like the author didn't trust me to
+        follow along
+- user: |-
+    These sunglasses have a sleek cat-eye design that gets compliments every time I wear them, and the tortoiseshell color is rich and warm, definitely a statement piece on its own.
+  assistant:
+    aspects:
+    - facet: design
+      polarity: positive
+      evidence: a sleek cat-eye design that gets compliments every time I wear them
+    - facet: color
+      polarity: positive
+      evidence: the tortoiseshell color is rich and warm, definitely a statement piece on its own
