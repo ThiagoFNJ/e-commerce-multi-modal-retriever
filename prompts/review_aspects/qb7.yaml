@@ -1,0 +1,221 @@
+parent: qb6
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'qb6 (current best, dev F1 0.5756) already spent this round''s cited motivating evidence on ''functionality''
+  and ''durability'' worked examples, but re-checking qb6''s OWN measured results shows two of those exact
+  motivating cases persisted uncorrected: B07K2SWHGN#4 (still pred ''functionality'' despite ''dispensing''
+  being a named exemplar word in the rule text) and B07ZKF8RSG#9 (still pred ''noodle thickness'' despite
+  the rule''s core-purpose ''effectiveness'' exception nearly verbatim describing this pasta-shape scenario).
+  Both confirm this experiment''s established pattern harder than before: naming a mechanism word in prose,
+  or even writing an exception clause that matches the case almost word-for-word, does not transfer without
+  an actual worked few-shot example of that specific shape. I picked the higher-value one of the two (functionality/dispensing:
+  combined FP8+FN7=15, one of the largest untouched masses) and used my example budget there with a new
+  synthetic napkin-dispenser review, close in domain/structure to B07K2SWHGN#4 but not copied. I deferred
+  the second (pasta/effectiveness, smaller FP5+FN4=9 mass) to stay within the 2-example cap and keep the
+  round narrow enough to attribute results cleanly. For the single largest error mass in the whole packet,
+  ''appearance'' (FP9+FN11=20), qb4 already tried and failed a text-only broadening of the ''color'' input
+  trigger -- so this round does not touch that rule text at all. Instead I used my second example slot
+  to test the untried lever (a worked example) on the exact recurring failure mode: B093Y8K7D8#7 (''Colorful
+  for summer... add color until the frost'') already contains the literal word ''color'' yet still mispredicts
+  ''appearance'', showing the miss isn''t about literal-word absence but about the decorative/seasonal
+  framing (''adds color to X'') not being recognized as a color opinion. I wrote a synthetic garden-decor
+  review with the same framing, mapped to ''color'', to test whether an example (not a text change) fixes
+  it. I combined that example with a demonstration of a new ''assembly'' facet in the same review to conserve
+  budget: B07K8K9P8N#6 (''Assembles nicely'' -> gold ''assembly'', pred ''build quality'') is a clean,
+  single-cause bug -- the current build-quality definition literally says ''...made or assembled...'',
+  which is the rule text itself pulling assembly language into build quality. This is a narrow, surgical
+  fix (remove ''or assembled'', add one new bullet), distinct from qb5''s failed edit, which was a full
+  four-dimension rewrite that also added ''strength'' and trigger-phrase anchors -- I am not repeating
+  that combination or isolating ''strength'', since no evidence separates which part of qb5''s bundle
+  caused its regression. Build quality is the second-largest untouched mass (FP8+FN10=18) and this targets
+  one clear contributor to it. Separately, I added ''finish'' as a new visual/aesthetic sub-term (matte/glossy/textured,
+  distinct from color/design/style/generic appearance), a text-only addition following the same lever
+  that was this experiment''s single most successful edit (qb3''s original color/design/style split, +0.019
+  F1) rather than a rewrite -- evidenced by B019QRWRBC#7 (''Love the Matte finish'' -> gold ''finish quality'',
+  pred ''appearance''), a clean miss of a genuinely uncovered term rather than a confusable-boundary bug,
+  so lower risk than qb4/qb5''s failed rewrites of already-covered boundaries. I left untouched: the book/media
+  ''engagement'' gap (1547602589#11 and B00JNQKR8C#9, now two worst-scoring instances rather than one)
+  because those names still don''t appear in the top-15 aggregate FP/FN lists, meaning the ceiling on
+  aggregate gain is small, and I prioritized the two largest measured masses instead within this round''s
+  example budget; ''price''/''value'' (B002L3TS5M#11, gold ''value: neutral'') because the annotator''s
+  own rationale flags it (''Is facet missing?''), i.e. the gold label itself is uncertain, and the current
+  rule would need an explicit exclusion relaxed on the strength of one noisy example; the size/fit collision
+  (B01BI85NTA#7) because it''s a single instance against a rule qb6 already judged as reasonable, consistent
+  with qb6''s ''application noise'' call on the same pair; ''strength'' vs ''sturdiness'' (B07FTS5166#6)
+  because it''s part of the same rule region qb5''s failed rewrite touched and no isolated evidence exists
+  this round; and the scattered flatware review (B00XXWPV4C#3, 5 non-matching FPs) because the errors
+  there are diffuse across an unusually long multi-topic review rather than pointing at one fixable rule
+  gap.'
+change_summary: '1. Removed ''or assembled'' from the ''build quality'' definition (it was the rule text
+  itself routing assembly-process language into build quality) and added a new ''assembly'' bullet defining
+  it as the process/experience of putting the item together, distinct from the finished item''s solidity
+  -- targets build quality''s FP8+FN10=18 mass via the clean single-cause bug evidenced by B07K8K9P8N#6
+  (''Assembles nicely'' -> gold ''assembly'', pred ''build quality''); narrower and different from qb5''s
+  failed full rewrite of this same rule region.
+
+
+  2. Added ''finish'' (surface treatment/sheen: matte vs glossy, textured vs smooth, brushed vs polished)
+  as a fourth named term in the visual/aesthetic bullet, alongside color/design/style, folding it into
+  the same fallback-to-''appearance'' list -- text-only addition following qb3''s most successful lever
+  (splitting a specific term out of generic ''appearance''), evidenced by B019QRWRBC#7 (gold ''finish
+  quality'', pred ''appearance'').
+
+
+  3. Added one new synthetic few-shot example (artificial sunflowers on a porch railing) demonstrating
+  ''color'' for decorative/seasonal color-adds-to-X framing (not just direct color-preference statements)
+  plus ''assembly'' for a quick snap-together setup -- targets ''appearance''s FP9+FN11=20 mass via the
+  untried worked-example lever (qb4''s text-trigger-broadening lever already failed and is not repeated),
+  evidenced by B093Y8K7D8#7 which already contains the literal word ''color'' yet still mispredicts ''appearance'';
+  also reinforces edit 1''s new ''assembly'' facet in the same example to stay within the 2-example cap.
+
+
+  4. Added one new synthetic few-shot example (napkin dispenser releasing several napkins at once) demonstrating
+  ''dispensing'' as the specific-mechanism facet instead of defaulting to ''functionality'' -- targets
+  functionality''s FP8+FN7=15 mass, directly evidenced by B07K2SWHGN#4, which persisted through qb6''s
+  own edit (the rule text already names ''dispensing'' as an example word, and the model still predicted
+  ''functionality'', confirming the pattern that naming a word in prose is not enough -- it needs its
+  own worked example, which the qb6 water-filter-pitcher example did not provide since it demonstrated
+  a different mechanism, ''lid mechanism'').'
+version: qb7
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'too small to hold much' -> facet 'size', polarity 'negative'. 'runs small, order a size up' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, listing/description accuracy (what the seller claimed vs what arrived is not itself a property of the product -- but if it caused a real physical mismatch, name that physical dimension instead, e.g. expecting a self-adhesive item and getting one that must be mounted is an 'installation' issue), and customer/technical support (including support responsiveness, even when the interaction is described at length) -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Only extract facets of the product actually being reviewed. Reviews sometimes describe or compare a different, separately-named product (a competitor, an alternative, something else the reviewer owns) -- do not extract facets for that other product's features, even if discussed at length; extract only what is said about the item under review.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Two commonly-confused sizing dimensions -- use the one the review actually describes: 'sizing accuracy' = whether the item runs true to its label or to expectations (runs small/large, order a size up/down, tag says one size but it measures or fits as another); 'size' = the item's absolute physical dimensions or capacity as a feature in itself, with no label or expectation being contradicted (e.g. 'the cups are small', 'too small to hold much'). 'fit' is a further separate dimension: how the item fits the body or its intended space once worn or installed (snug, loose, comfortable) -- use 'fit' only when the review is about that experience, not about the size label.
+  - 'condition' = the physical state THIS specific unit arrived in or has since fallen into (scratched, dented, torn, dirty/filthy, defective on arrival) -- a one-off, unit-specific observation. Distinct from 'appearance' (the item's designed visual style, look, or color) and from a general resistance or susceptibility property the review is characterizing, e.g. 'scratch resistance' -- if the review is testing or describing how easily the material scratches, dents, or wears in general use (not just reporting damage on the unit received), name that property, not 'condition'.
+  - Prefer the single broadest canonical dimension over several narrow compound ones, but only when multiple sentences describe facets of the SAME underlying quality -- e.g. prefer 'effectiveness' over 'pain relief effectiveness' + 'scalp massage effectiveness'. Do NOT collapse genuinely distinct product dimensions into one facet just because they appear in the same sentence or review -- e.g. an item that both wobbles when standing and has parts that detach is two facets ('stability' and 'part fit'), not one 'build quality'; a shirt that runs large but looks great is two facets ('sizing accuracy' and 'appearance'), not one.
+  - 'stability' = whether the item wobbles, rocks, tips over, or feels unsteady in use or when standing/mounted -- distinct from 'build quality'/'sturdiness' (how solidly it's made or assembled) and 'durability' (wear over time).
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' (call it 'sturdiness' when the review's own words are 'solid'/'sturdy'/'flimsy') = how solidly or well the finished, already-assembled item is made (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time; 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time.
+  - 'assembly' = the process or experience of putting the item together (instructions clear or confusing, parts fit together easily or fought back, hardware included and aligned, how long it took) -- distinct from 'build quality', which judges the solidity of the item once it IS assembled, not the assembling itself. 'Assembles nicely' or 'a nightmare to put together' is 'assembly', not 'build quality'.
+  - Visual/aesthetic look: use the review's own more specific term when it names one -- 'color' when the opinion is specifically about color (not comparing received color/pattern to what was advertised or pictured -- that's 'color accuracy'); 'design' when the review is about how the item is engineered or laid out to look the way it does (pattern, silhouette, construction-driven styling); 'style' when the review is judging fashion sense, taste, or how well the item suits an occasion or coordinates with other things, independent of its construction (stylish, goes well with..., classic look, right for the occasion); 'finish' when the review is about the surface treatment or sheen of the material itself (matte vs glossy, textured vs smooth, brushed vs polished). Fall back to plain 'appearance' only for general look/attractiveness statements that don't single out color, design, style, or finish, e.g. 'I really like the retro look'.
+  - 'functionality' and 'performance' are last-resort labels for whether the product works or performs as intended overall. When the review names a specific part, mechanism, or capability (a lid, a zipper, a dispenser, a camera, how many different ways it can be used), name that instead -- e.g. 'lid mechanism', 'dispensing', 'camera', 'versatility' -- rather than defaulting to 'functionality'/'performance'. Exception: if what's being judged IS the product's core purpose rather than a secondary part -- e.g. blue-light glasses actually filtering out blue light, a pain-relief device actually relieving pain, a pasta maker producing the shape of noodle it claims to -- use 'effectiveness' instead of naming that core mechanism (see the broadest-dimension rule above).
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp
+- user: |-
+    The color is exactly like the photos and I really like the retro look, but mine arrived with a scratch across the front and one corner dented.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: I really like the retro look
+    - facet: condition
+      polarity: negative
+      evidence: arrived with a scratch across the front and one corner dented
+- user: |-
+    The design is so sleek and modern, and I love the deep navy color. Wish the strap was more adjustable though.
+  assistant:
+    aspects:
+    - facet: design
+      polarity: positive
+      evidence: The design is so sleek and modern
+    - facet: color
+      polarity: positive
+      evidence: I love the deep navy color
+    - facet: adjustability
+      polarity: negative
+      evidence: Wish the strap was more adjustable
+- user: |-
+    This cream really helped calm the redness on my cheeks, and the itching on my arms was gone within a few days too. A bit pricey compared to other brands, but worth it for how well it works.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: really helped calm the redness... the itching... was gone within a few days
+- user: |-
+    The lid on this pitcher pops open if you tilt it even slightly, which is annoying when pouring. That said, the filter itself does its job -- my tap water tastes so much cleaner and there's no more chlorine smell.
+  assistant:
+    aspects:
+    - facet: lid mechanism
+      polarity: negative
+      evidence: lid on this pitcher pops open if you tilt it even slightly
+    - facet: effectiveness
+      polarity: positive
+      evidence: tap water tastes so much cleaner and there's no more chlorine smell
+- user: |-
+    After six months of daily use the fabric on the seat has started to thin and fade, but the recliner mechanism itself has never once jammed or failed to lock in place.
+  assistant:
+    aspects:
+    - facet: durability
+      polarity: negative
+      evidence: fabric on the seat has started to thin and fade
+    - facet: reliability
+      polarity: positive
+      evidence: recliner mechanism itself has never once jammed or failed to lock
+- user: |-
+    These artificial sunflowers add such a cheerful pop of color to my porch railing all summer long, and clipping them onto the railing took no time at all.
+  assistant:
+    aspects:
+    - facet: color
+      polarity: positive
+      evidence: such a cheerful pop of color
+    - facet: assembly
+      polarity: positive
+      evidence: clipping them onto the railing took no time at all
+- user: |-
+    The dispenser on this napkin holder pops out three or four napkins every time you pull one, so half the stack ends up wasted on the counter.
+  assistant:
+    aspects:
+    - facet: dispensing
+      polarity: negative
+      evidence: pops out three or four napkins every time you pull one

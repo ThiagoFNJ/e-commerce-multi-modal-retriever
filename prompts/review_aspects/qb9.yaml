@@ -1,0 +1,211 @@
+parent: qb8
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two error patterns dominate this round''s fresh evidence, both distinct from qb8''s own edits
+  (which targeted durability and functionality/dispensing and are left alone here: durability''s combined
+  mass didn''t shrink under qb8''s edit -- FP actually rose 10->11 while FN fell 6->5, net unchanged at
+  16 -- and no new worst-20 evidence isolates why, so re-editing that bullet blind would repeat the qb5/qb7
+  pattern of untested hypothesis edits). First: the existing ''listing/description accuracy is not a product
+  aspect -- name the physical dimension instead'' rule has exactly one worked case (self-adhesive/installation)
+  and is failing to generalize -- B0863T921B#2 (ingredients printed on the box differ from the tube) predicts
+  ''ingredient accuracy'' instead of gold ''ingredients'', and B00ILUP0VU#12 (watch hand alignment off
+  by 30 minutes) predicts bare ''accuracy'' instead of gold ''hand alignment''. Both show the model inventing
+  a generic ''<noun> accuracy''/''accuracy'' facet instead of applying the rule''s own instruction to
+  name the physical property -- the same text-rule-without-worked-example non-transfer pattern qb3 first
+  identified and qb8 confirmed for functionality/dispensing. Second: the ''effectiveness'' core-purpose
+  exception, flagged in qb8''s own notes as needing a dedicated worked example but deferred for space,
+  now has convergent failures: B07ZKF8RSG#9 (angel-hair-not-spaghetti) is the exact scenario the rule
+  already cites in TEXT (''a pasta maker producing the shape of noodle it claims'') yet still predicts
+  ''product accuracy'', and B0837CR4XK#6 (nose-insert device that stopped slowing the dog as it grew)
+  predicts ''fit'' instead of the core-purpose ''effectiveness''. Both patterns share one root cause --
+  the model defaults to inventing a generic ''<noun> accuracy'' facet whenever a review describes a mismatch
+  between claimed/expected and actual product behavior, whether that mismatch is about a secondary physical
+  property or the core purpose -- so I fixed both with one rule generalization plus two worked examples
+  (one per sub-case) rather than diluting the 2-example cap across the many single-instance ''appearance''
+  cases. ''Appearance'' is still the largest raw combined mass (FP10+FN11=21, up slightly from qb8''s
+  own 20), but the only two worst-20 instances -- B093Y8K7D8#7 (''colorful''->color) and B019QRWRBC#7
+  (''matte finish''->finish quality) -- are the identical single-instance cases already declined twice:
+  once as a regression risk (qb4''s color-trigger broadening) and once as insufficient evidence (qb8).
+  Nothing new emerged this round to justify a third attempt, so I left it. I also left ''versatility''
+  FP(6) untouched despite B0000C864G#2 (dodgeball/4-square ball predicted ''versatility'', gold ''functionality'')
+  because it''s a single instance and reworking the versatility/functionality boundary risks the same
+  kind of regression qb4 hit on appearance -- flagging it for a future round if the pattern recurs with
+  more evidence. Per the semantic-matching note, aligning naming with gold vocabulary (avoiding invented
+  ''...accuracy'' compounds) is itself the lever exercised here, not a new dimension or schema change.'
+change_summary: '1. Generalized the product-intrinsic listing/description-accuracy exception: added two
+  more worked sub-cases (ingredients/contents mismatch -> name the ingredient dimension; core-purpose
+  failure -> ''effectiveness'') and an explicit instruction not to invent new ''<noun> accuracy''/''accuracy''
+  facets beyond the two already-defined ''sizing accuracy''/''color accuracy''. Targets the recurring
+  generic-accuracy-facet failure evidenced by B0863T921B#2 (ingredients on box vs tube -> predicted ''ingredient
+  accuracy'', gold ''ingredients'') and B00ILUP0VU#12 (watch hand alignment -> predicted ''accuracy'',
+  gold ''hand alignment'').
+
+  2. Added a new synthetic few-shot example (juicer that doesn''t extract juice from whole apples as claimed)
+  giving the ''effectiveness'' core-purpose exception its first worked exemplar -- targets B07ZKF8RSG#9
+  (angel-hair pasta maker), which still predicts ''product accuracy'' despite the rule already citing
+  an identical scenario in text-only form, and B0837CR4XK#6 (nose-insert device), which predicted ''fit''
+  instead of the core-purpose outcome.
+
+  3. Added a new synthetic few-shot example (package claims lavender scent, arrives smelling like vanilla)
+  giving the generic-accuracy-avoidance rule a worked exemplar for the non-core-purpose case -- reinforces
+  naming the specific physical property (''scent'') instead of inventing ''scent accuracy'' or excluding
+  it as listing accuracy.'
+version: qb9
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'too small to hold much' -> facet 'size', polarity 'negative'. 'runs small, order a size up' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, listing/description accuracy (what the seller claimed vs what arrived is not itself a property of the product -- but if it caused a real physical mismatch, name that physical dimension instead, e.g. expecting a self-adhesive item and getting one that must be mounted is an 'installation' issue; a box or label listing different ingredients/contents than what's actually in the package is an 'ingredients' issue; a device that doesn't do what it's designed to do is an 'effectiveness' issue -- in all these cases name the specific physical property, or when it's the product's core purpose use 'effectiveness'; do not invent a new '<noun> accuracy' or generic 'accuracy' facet beyond the two already defined below, 'sizing accuracy' and 'color accuracy'), and customer/technical support (including support responsiveness, even when the interaction is described at length) -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Only extract facets of the product actually being reviewed. Reviews sometimes describe or compare a different, separately-named product (a competitor, an alternative, something else the reviewer owns) -- do not extract facets for that other product's features, even if discussed at length; extract only what is said about the item under review.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Two commonly-confused sizing dimensions -- use the one the review actually describes: 'sizing accuracy' = whether the item runs true to its label or to expectations (runs small/large, order a size up/down, tag says one size but it measures or fits as another); 'size' = the item's absolute physical dimensions or capacity as a feature in itself, with no label or expectation being contradicted (e.g. 'the cups are small', 'too small to hold much'). 'fit' is a further separate dimension: how the item fits the body or its intended space once worn or installed (snug, loose, comfortable) -- use 'fit' only when the review is about that experience, not about the size label.
+  - 'condition' = the physical state THIS specific unit arrived in or has since fallen into (scratched, dented, torn, dirty/filthy, defective on arrival) -- a one-off, unit-specific observation. Distinct from 'appearance' (the item's designed visual style, look, or color) and from a general resistance or susceptibility property the review is characterizing, e.g. 'scratch resistance' -- if the review is testing or describing how easily the material scratches, dents, or wears in general use (not just reporting damage on the unit received), name that property, not 'condition'.
+  - Prefer the single broadest canonical dimension over several narrow compound ones, but only when multiple sentences describe facets of the SAME underlying quality -- e.g. prefer 'effectiveness' over 'pain relief effectiveness' + 'scalp massage effectiveness'. Do NOT collapse genuinely distinct product dimensions into one facet just because they appear in the same sentence or review -- e.g. an item that both wobbles when standing and has parts that detach is two facets ('stability' and 'part fit'), not one 'build quality'; a shirt that runs large but looks great is two facets ('sizing accuracy' and 'appearance'), not one.
+  - 'stability' = whether the item wobbles, rocks, tips over, or feels unsteady in use or when standing/mounted -- distinct from 'build quality'/'sturdiness' (how solidly it's made or assembled) and 'durability' (wear over time).
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' (call it 'sturdiness' when the review's own words are 'solid'/'sturdy'/'flimsy' rather than about assembly) = how solidly or well the item is made or assembled (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time, but if what's being judged is resistance to one specific kind of damage (scratching, denting, staining, moisture) rather than general wear-and-tear, name that specific resistance instead (e.g. 'scratch resistance') -- the same specific-over-generic preference used for 'functionality' below; 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time.
+  - Visual/aesthetic look: use the review's own more specific term when it names one -- 'color' when the opinion is specifically about color (not comparing received color/pattern to what was advertised or pictured -- that's 'color accuracy'); 'design' when the review is about how the item is engineered or laid out to look the way it does (pattern, silhouette, construction-driven styling); 'style' when the review is judging fashion sense, taste, or how well the item suits an occasion or coordinates with other things, independent of its construction (stylish, goes well with..., classic look, right for the occasion). Fall back to plain 'appearance' only for general look/attractiveness statements that don't single out color, design, or style, e.g. 'I really like the retro look'.
+  - 'functionality' and 'performance' are last-resort labels for whether the product works or performs as intended overall. When the review names a specific part, mechanism, or capability (a lid, a zipper, a dispenser, a camera, how many different ways it can be used), name that instead -- e.g. 'lid mechanism', 'dispensing', 'camera', 'versatility' -- rather than defaulting to 'functionality'/'performance'. Exception: if what's being judged IS the product's core purpose rather than a secondary part -- e.g. blue-light glasses actually filtering out blue light, a pain-relief device actually relieving pain, a pasta maker producing the shape of noodle it claims, a juicer actually extracting juice -- use 'effectiveness' instead of naming that core mechanism (see the broadest-dimension rule above). This applies even when the review frames the failure as the product not matching what it claimed or promised -- that mismatch is still 'effectiveness', not a listing/description-accuracy exclusion and not an invented '...accuracy' facet.
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp
+- user: |-
+    The color is exactly like the photos and I really like the retro look, but mine arrived with a scratch across the front and one corner dented.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: I really like the retro look
+    - facet: condition
+      polarity: negative
+      evidence: arrived with a scratch across the front and one corner dented
+- user: |-
+    The design is so sleek and modern, and I love the deep navy color. Wish the strap was more adjustable though.
+  assistant:
+    aspects:
+    - facet: design
+      polarity: positive
+      evidence: The design is so sleek and modern
+    - facet: color
+      polarity: positive
+      evidence: I love the deep navy color
+    - facet: adjustability
+      polarity: negative
+      evidence: Wish the strap was more adjustable
+- user: |-
+    This cream really helped calm the redness on my cheeks, and the itching on my arms was gone within a few days too. A bit pricey compared to other brands, but worth it for how well it works.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: really helped calm the redness... the itching... was gone within a few days
+- user: |-
+    The lid on this pitcher pops open if you tilt it even slightly, which is annoying when pouring. That said, the filter itself does its job -- my tap water tastes so much cleaner and there's no more chlorine smell.
+  assistant:
+    aspects:
+    - facet: lid mechanism
+      polarity: negative
+      evidence: lid on this pitcher pops open if you tilt it even slightly
+    - facet: effectiveness
+      polarity: positive
+      evidence: tap water tastes so much cleaner and there's no more chlorine smell
+- user: |-
+    The roll holder itself feels sturdy on the wall, but you have to yank hard to tear off a single sheet and half the time it rips two sheets' worth off together instead of one clean tear.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels sturdy on the wall
+    - facet: dispensing
+      polarity: negative
+      evidence: yank hard to tear off a single sheet and half the time it rips two sheets' worth off together
+- user: |-
+    After six months of daily use the fabric on the seat has started to thin and fade, but the recliner mechanism itself has never once jammed or failed to lock in place.
+  assistant:
+    aspects:
+    - facet: durability
+      polarity: negative
+      evidence: fabric on the seat has started to thin and fade
+    - facet: reliability
+      polarity: positive
+      evidence: recliner mechanism itself has never once jammed or failed to lock
+- user: |-
+    The handles on this pan have held up fine after a year of daily cooking, but the nonstick coating scratches if you so much as look at it with a metal spoon.
+  assistant:
+    aspects:
+    - facet: durability
+      polarity: positive
+      evidence: handles have held up fine after a year of daily cooking
+    - facet: scratch resistance
+      polarity: negative
+      evidence: coating scratches if you so much as look at it with a metal spoon
+- user: |-
+    The box says this juicer extracts juice from whole apples, but mine leaves the apples half-crushed with barely any juice coming out no matter how I feed them in.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: negative
+      evidence: leaves the apples half-crushed with barely any juice coming out
+- user: |-
+    Package says lavender scent but what arrived smells like plain vanilla to me, nothing floral about it at all.
+  assistant:
+    aspects:
+    - facet: scent
+      polarity: negative
+      evidence: smells like plain vanilla to me, nothing floral about it at all
