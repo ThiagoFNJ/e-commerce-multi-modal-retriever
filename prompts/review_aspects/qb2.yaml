@@ -1,0 +1,143 @@
+parent: qb1
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'qb1 (dev F1 0.5479, +0.0494 over v2) fixed the sizing-vocabulary and appearance-vocabulary gaps
+  from v2, but this round''s error counts show it over-corrected one of them and surfaced two new collisions.
+  (1) ''size'' is now the single largest false positive (16) while ''sizing accuracy'' (9) and ''fit''
+  (5) are top misses -- the mirror image of v2''s problem. Three worst reviews are all the same ''runs
+  differently than the label says'' pattern: B01IAIHRWW#2 (''order these in xl... very small... can not
+  wear'') gold sizing accuracy, predicted size positive+negative; B01HHJUX3K#3 (''purchased size wide
+  10.5... got 11.5, tag said 10.5'') gold sizing accuracy, predicted only size; B07G4N6PPJ#9 (''2XL larger
+  than other 2XL shirts'') gold sizing accuracy, predicted size. This is exactly the pattern in qb1''s
+  own ''Runs small, order a size up'' example, which qb1 renamed from sizing accuracy to size -- that
+  rename was the wrong direction given this evidence, so I reverted it and added a rule separating ''sizing
+  accuracy'' (label/expectation mismatch) from ''size'' (absolute dimension, e.g. B096NCTTV5#3''s cup
+  size) from ''fit'' (body/installation fit, top-5 miss with no naming rule at all previously). (2) Two
+  worst reviews show ''appearance''/''cleanliness'' predicted where gold says ''condition'': 1119563232#0
+  (''cover dragged along a road'') gold condition, predicted appearance; B006WA94T0#9 (''disgustingly
+  filthy'') gold condition, predicted cleanliness -- added a condition-vs-appearance rule plus a new synthetic
+  example, since as-received damage/dirt had zero prior representation. (3) qb1''s own broadest-dimension
+  rule is now causing under-decomposition of genuinely distinct facets: B01N2U5J5U#1 (wobbles + parts
+  fall off) gold stability+part fit, predicted only build quality; B07G4N6PPJ#9 (size + look) gold sizing
+  accuracy+appearance, predicted only size -- scoped the rule to same-underlying-quality restatements
+  with explicit counter-examples. (4) B07ZHYS7MD#6 (''charging station didnt work very long... customer
+  support'') gold reliability only, but the model still emitted durability plus two service-adjacent FPs
+  (''customer service'', ''product support responsiveness'') despite the existing exclusion -- broadened
+  the exclusion wording beyond the literal phrase ''customer service''. (5) B08L4MT463#8 (''not the most
+  solid product'') gold sturdiness, predicted build quality -- added ''sturdiness'' as the build-quality
+  label when the review''s own words are solid/sturdy/flimsy. I left value-for-money/compatibility/usability
+  FPs (6/6/5) untouched: the packet has no review text showing how they leak, so a rule change there would
+  be a guess, not evidence. I also left the book few-shot example untouched despite 1547602589#11''s severe
+  over-decomposition (plot/characters/writing quality vs gold''s engagement/emotional impact/excitement)
+  -- fixing its vocabulary would need a third few-shot edit (over the 2-change budget) and a system rule
+  targeting it this round would directly contradict that still-present example; flagging for next round
+  instead.'
+change_summary: '1. Reverted the ''Runs small, order a size up'' few-shot example''s facet from ''size''
+  back to ''sizing accuracy'', and updated the polarity-neutral rule''s inline examples to match -- targets
+  top FP ''size'' (16) and misses ''sizing accuracy'' (9) + ''fit'' (5), evidenced in B01IAIHRWW#2, B01HHJUX3K#3,
+  B07G4N6PPJ#9.
+
+
+  2. Added a rule separating ''sizing accuracy'' (label/expectation mismatch) from ''size'' (absolute
+  dimension) from ''fit'' (body/installation fit) -- same evidence as #1.
+
+
+  3. Added a ''condition'' (as-received damage/dirt) vs ''appearance'' (designed look/color) rule plus
+  a new synthetic few-shot example -- targets appearance/cleanliness FPs colliding with gold ''condition''
+  in 1119563232#0 and B006WA94T0#9.
+
+
+  4. Scoped the over-decomposition rule to same-underlying-quality restatements only, with explicit counter-examples
+  for genuinely distinct facets -- fixes under-decomposition in B01N2U5J5U#1 (stability+part fit merged
+  into build quality) and B07G4N6PPJ#9 (sizing+appearance merged into size).
+
+
+  5. Broadened the service exclusion from ''customer service'' to ''customer/technical support (including
+  support responsiveness)'' -- targets the two service-adjacent FPs in B07ZHYS7MD#6 alongside its durability/reliability
+  confusion.
+
+
+  6. Added ''sturdiness'' as the build-quality label to use when the review''s own words are solid/sturdy/flimsy
+  -- targets B08L4MT463#8 (gold sturdiness, predicted build quality).'
+version: qb2
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'too small to hold much' -> facet 'size', polarity 'negative'. 'runs small, order a size up' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, and customer/technical support (including support responsiveness) -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Two commonly-confused sizing dimensions -- use the one the review actually describes: 'sizing accuracy' = whether the item runs true to its label or to expectations (runs small/large, order a size up/down, tag says one size but it measures or fits as another); 'size' = the item's absolute physical dimensions or capacity as a feature in itself, with no label or expectation being contradicted (e.g. 'the cups are small', 'too small to hold much'). 'fit' is a further separate dimension: how the item fits the body or its intended space once worn or installed (snug, loose, comfortable) -- use 'fit' only when the review is about that experience, not about the size label.
+  - 'condition' = the physical state the item arrived in or has fallen into (scratched, dented, torn, dirty/filthy, defective on arrival) -- distinct from 'appearance', which is the item's designed visual style, look, or color. Damage or dirt is 'condition', not 'appearance' or 'cleanliness'.
+  - Prefer the single broadest canonical dimension over several narrow compound ones, but only when multiple sentences describe facets of the SAME underlying quality -- e.g. prefer 'effectiveness' over 'pain relief effectiveness' + 'scalp massage effectiveness'. Do NOT collapse genuinely distinct product dimensions into one facet just because they appear in the same sentence or review -- e.g. an item that both wobbles when standing and has parts that detach is two facets ('stability' and 'part fit'), not one 'build quality'; a shirt that runs large but looks great is two facets ('sizing accuracy' and 'appearance'), not one.
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' (call it 'sturdiness' when the review's own words are 'solid'/'sturdy'/'flimsy' rather than about assembly) = how solidly or well the item is made or assembled (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time; 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time.
+  - Visual/aesthetic look -- how it looks, its color, its style -- is 'appearance', not 'design' or 'color accuracy', unless the review is specifically comparing the received color/pattern against what was advertised or pictured.
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp
+- user: |-
+    The color is exactly like the photos and I really like the retro look, but mine arrived with a scratch across the front and one corner dented.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: I really like the retro look
+    - facet: condition
+      polarity: negative
+      evidence: arrived with a scratch across the front and one corner dented

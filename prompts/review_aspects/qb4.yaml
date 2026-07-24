@@ -1,0 +1,197 @@
+parent: qb3
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'qb3''s own error breakdown after this round shows three dominant, generalizable collisions plus
+  one already-stated-but-ignored exclusion rule. (1) ''appearance'' is still the single largest combined
+  error mass (FP8+FN11=19) and the exact same review used as qb3''s own evidence, B093Y8K7D8#7 (''Colorful
+  for summer and autumn decor''), still fails post-fix -- because qb3''s color rule only triggered on
+  the literal word ''color'', not on adjectival color language like ''colorful''. I broadened the trigger
+  to include descriptive/adjectival color language. (2) ''durability'' is the single largest FP facet
+  overall (12) and B083GMRDWB#4 gives a clean, generalizable case: ''after less than 3 months, one no
+  longer works'' is gold ''reliability'' but was predicted ''durability'' -- the rule already distinguishes
+  wear-over-time from malfunction in words, but per the pattern qb3 itself already established (the effectiveness-collapse
+  rule existed in text for a full round before it transferred, only after a worked example was added),
+  a text-only distinction here is unlikely to transfer either, so I added an explicit ''stopped working''
+  trigger phrase to the rule AND a new synthetic worked example. (3) ''sturdiness'' (FP8) and ''build
+  quality'' (FN9, the #2 missed facet) combine to 17, and two reviews show it''s being used as an untargeted
+  catch-all in both directions it shouldn''t be: B076GTTQLJ#4 (''temples snap in and out of place...in
+  a good way'', no solid/sturdy/flimsy wording) is gold ''build quality'' but predicted ''sturdiness'',
+  and B07FTS5166#6 (''this leash can handle him'' pulling, gold ''strength'') was also predicted ''sturdiness''.
+  ''strength'' is confirmed real gold vocabulary here, not a hypothetical, and ''sturdiness''/''build
+  quality'' had no few-shot demonstration at all despite being defined in text three rounds running --
+  the same no-example gap qb3 diagnosed for ''functionality''. Added a ''strength'' facet definition and
+  a new worked example covering all three (sturdiness/build quality/strength) in one review, mirroring
+  the design/color example''s structure. (4) ''customer support'' (FP5) is a rule that already exists
+  verbatim in the prompt yet B07ZHYS7MD#6 extracts ''customer support responsiveness'' despite gold being
+  only ''reliability'', even though the review spends several sentences on the support saga -- again the
+  stated-rule-without-example pattern, so I combined its reinforcement into the same new reliability example
+  (support discussed at length, but only reliability extracted) rather than spending a third example slot.
+  I stayed within the 2-example-change budget by having each new example do double duty. Left unfixed,
+  flagged for next round: ''price''/''value for money''/''compatibility'' FPs (no clean generalizable
+  evidence this round, same as qb3''s own call); the fit/size confusion is now contradictory rather than
+  one-directional (B01BI85NTA#7 wants ''fit'' where model said ''size'', B07RYK3J41#6 wants ''size'' where
+  the review literally says ''fit'' and model said ''fit'') -- a rule change here would likely just flip
+  which case fails, so left alone; B0863T921B#2 (ingredients label-mismatch, gold ''ingredients'' not
+  ''ingredient accuracy'') is single-review evidence for a case the existing listing-accuracy rule should
+  already cover conceptually; 1547602589#11 (book review, all-FP) and B003DA48XO#4 (''drops bombs off
+  this tee'' idiom misread as negative durability) look like model comprehension failures rather than
+  facet-naming collisions, not fixable via naming rules; B00NHQFA1I#12 and B002L3TS5M#11 have annotator-flagged
+  or unusual gold groupings, left untouched per the same discipline qb3 applied to B002L3TS5M#11.'
+change_summary: '1. Broadened the visual/aesthetic ''color'' trigger to include adjectival/descriptive
+  color language (colorful, vibrant, bright, named hues like ''deep navy''), not only the literal word
+  ''color'' -- targets recurring top error ''appearance'' (FP8+FN11=19), evidenced by B093Y8K7D8#7 still
+  failing after qb3''s fix because ''colorful'' didn''t trigger the old literal-word rule.
+
+  2. Refined the reliability/durability rule to explicitly state that ''stopped working''/''no longer
+  functions''/''quit'' language is ''reliability'', not ''durability'', even when wear is also mentioned
+  -- targets top FP ''durability'' (12), evidenced by B083GMRDWB#4 (''one no longer works'' -> gold reliability,
+  predicted durability).
+
+  3. Added a new ''strength'' facet definition (capacity to bear weight/force without breaking or bending),
+  distinct from sturdiness/build quality/durability -- targets B07FTS5166#6 (gold ''strength'', predicted
+  ''sturdiness''), confirming ''strength'' is real gold vocabulary the prompt had no name for.
+
+  4. Extended the customer/technical-support exclusion to explicitly cover cases where support is discussed
+  at length or is the focus of the complaint -- targets FP ''customer support'' (5), evidenced by B07ZHYS7MD#6
+  (gold reliability only; predicted included ''customer support responsiveness'' despite a multi-sentence
+  support saga).
+
+  5. Added a new synthetic few-shot example demonstrating a malfunction (''motor just stopped turning
+  on'') labeled ''reliability'' (not ''durability'') while a lengthy customer-support complaint in the
+  same review is correctly excluded -- reinforces edits 2 and 4 together in one example slot, since qb3''s
+  own notes already established that stated-but-undemonstrated rules (e.g. the effectiveness-collapse
+  rule) don''t reliably transfer without a worked example.
+
+  6. Added a second new synthetic few-shot example demonstrating ''sturdiness'' (explicit ''sturdy''/no-flex
+  wording), ''build quality'' (general positive construction comment with no sturdy/flimsy wording), and
+  ''strength'' (load-bearing claim) as three distinct facets in one review -- targets the combined ''sturdiness''
+  FP (8) + ''build quality'' FN (9) = 17 error mass, evidenced by B076GTTQLJ#4 (gold build quality, predicted
+  sturdiness, no sturdy/solid/flimsy wording present) and B07FTS5166#6 (gold strength, predicted sturdiness);
+  also the first-ever worked example for the build quality/sturdiness distinction, which has existed as
+  text-only since an earlier round.'
+version: qb4
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'too small to hold much' -> facet 'size', polarity 'negative'. 'runs small, order a size up' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, listing/description accuracy (what the seller claimed vs what arrived is not itself a property of the product -- but if it caused a real physical mismatch, name that physical dimension instead, e.g. expecting a self-adhesive item and getting one that must be mounted is an 'installation' issue), and customer/technical support (including support responsiveness) -- they are not aspects of the product, even when support is discussed at length or is the focus of the reviewer's complaint.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Only extract facets of the product actually being reviewed. Reviews sometimes describe or compare a different, separately-named product (a competitor, an alternative, something else the reviewer owns) -- do not extract facets for that other product's features, even if discussed at length; extract only what is said about the item under review.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Two commonly-confused sizing dimensions -- use the one the review actually describes: 'sizing accuracy' = whether the item runs true to its label or to expectations (runs small/large, order a size up/down, tag says one size but it measures or fits as another); 'size' = the item's absolute physical dimensions or capacity as a feature in itself, with no label or expectation being contradicted (e.g. 'the cups are small', 'too small to hold much'). 'fit' is a further separate dimension: how the item fits the body or its intended space once worn or installed (snug, loose, comfortable) -- use 'fit' only when the review is about that experience, not about the size label.
+  - 'condition' = the physical state THIS specific unit arrived in or has since fallen into (scratched, dented, torn, dirty/filthy, defective on arrival) -- a one-off, unit-specific observation. Distinct from 'appearance' (the item's designed visual style, look, or color) and from a general resistance or susceptibility property the review is characterizing, e.g. 'scratch resistance' -- if the review is testing or describing how easily the material scratches, dents, or wears in general use (not just reporting damage on the unit received), name that property, not 'condition'.
+  - Prefer the single broadest canonical dimension over several narrow compound ones, but only when multiple sentences describe facets of the SAME underlying quality -- e.g. prefer 'effectiveness' over 'pain relief effectiveness' + 'scalp massage effectiveness'. Do NOT collapse genuinely distinct product dimensions into one facet just because they appear in the same sentence or review -- e.g. an item that both wobbles when standing and has parts that detach is two facets ('stability' and 'part fit'), not one 'build quality'; a shirt that runs large but looks great is two facets ('sizing accuracy' and 'appearance'), not one.
+  - 'stability' = whether the item wobbles, rocks, tips over, or feels unsteady in use or when standing/mounted -- distinct from 'build quality'/'sturdiness' (how solidly it's made or assembled) and 'durability' (wear over time).
+  - 'strength' = the item's capacity to bear weight, tension, or force without breaking, bending, or giving way (holds a stated weight, withstands pulling or pushing) -- distinct from 'sturdiness'/'build quality' (how solidly the item is put together) and 'durability' (wear from repeated use over time).
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' (call it 'sturdiness' when the review's own words are 'solid'/'sturdy'/'flimsy' rather than about assembly) = how solidly or well the item is made or assembled (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time (fraying, wearing thin, gradually deteriorating with use); 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time -- use 'reliability', not 'durability', whenever the review says the item stopped working, quit, or no longer functions at all (e.g. 'stopped turning on', 'no longer works', 'quit after two months'), even if physical wear is also mentioned nearby.
+  - Visual/aesthetic look: use the review's own more specific term when it names one -- 'color' whenever the opinion singles out color, including adjectival or descriptive color language (colorful, vibrant, bright, a named hue/shade like 'deep navy'), not only the literal word 'color' (not comparing received color/pattern to what was advertised or pictured -- that's 'color accuracy'); 'design' when the review uses words like design/style/pattern about how the item is designed or styled. Fall back to plain 'appearance' only for general look/attractiveness statements that don't single out color or design, e.g. 'I really like the retro look'.
+  - 'functionality' is a last-resort label for whether the product works or performs as intended overall. When the review names a specific part, mechanism, or capability (a lid, a zipper, a dispenser, how many different ways it can be used), name that instead -- e.g. 'lid mechanism', 'dispensing', 'versatility' -- rather than defaulting to 'functionality'.
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp
+- user: |-
+    The color is exactly like the photos and I really like the retro look, but mine arrived with a scratch across the front and one corner dented.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: I really like the retro look
+    - facet: condition
+      polarity: negative
+      evidence: arrived with a scratch across the front and one corner dented
+- user: |-
+    The design is so sleek and modern, and I love the deep navy color. Wish the strap was more adjustable though.
+  assistant:
+    aspects:
+    - facet: design
+      polarity: positive
+      evidence: The design is so sleek and modern
+    - facet: color
+      polarity: positive
+      evidence: I love the deep navy color
+    - facet: adjustability
+      polarity: negative
+      evidence: Wish the strap was more adjustable
+- user: |-
+    This cream really helped calm the redness on my cheeks, and the itching on my arms was gone within a few days too. A bit pricey compared to other brands, but worth it for how well it works.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: really helped calm the redness... the itching... was gone within a few days
+- user: |-
+    I loved this blender for the first month, but then the motor just stopped turning on and it won't start no matter what I try. I emailed customer support five times over three weeks asking for a replacement part and never got a straight answer.
+  assistant:
+    aspects:
+    - facet: reliability
+      polarity: negative
+      evidence: the motor just stopped turning on and it won't start no matter what I try
+- user: |-
+    This step ladder feels really sturdy when I'm standing on the top step -- no flex in the frame at all. It's clearly well put together too, nothing about it feels cheap. And it easily held my 220lb husband without any creaking or bending.
+  assistant:
+    aspects:
+    - facet: sturdiness
+      polarity: positive
+      evidence: feels really sturdy when I'm standing on the top step
+    - facet: build quality
+      polarity: positive
+      evidence: It's clearly well put together too, nothing about it feels cheap
+    - facet: strength
+      polarity: positive
+      evidence: easily held my 220lb husband without any creaking or bending
