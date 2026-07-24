@@ -1,0 +1,210 @@
+parent: gb6
+created: '2026-07-23'
+status: candidate
+model: gemma4:12b-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'gb6 (F1 0.5037) remains the best candidate; its two children gb7 (CONSOLIDATE-rule prose restatement,
+  F1 0.4816) and gb8 (physical-part-noun ban, F1 0.4842) both underperformed it, so this round returns
+  to gb6 as parent and avoids both directions (no further CONSOLIDATE prose, no component-noun ban), plus
+  the earlier-failed gb3/gb4/gb5 directions (durability ban, recommendation ban, price/value outcome-rule
+  reframe). Grounded in gb6''s own measured results instead: (1) Two of the 20 worst reviews are now dominated
+  almost entirely by literal facet-name duplication rather than genuine FP/FN diversity -- B08NV5452X#3
+  outputs ''fit'' five times (5 of its 6 FPs) for a review whose gold is the single facet ''length'',
+  and B01N2U5J5U#1 outputs ''build quality'' four times for a review whose gold is ''stability''+''part
+  fit''. This persists even though gb6 already added a mandatory dedup re-scan step, on top of gb2''s
+  original dedup rule -- two rounds of prose have not stopped it, and gb7''s attempt to strengthen the
+  CONSOLIDATE prose further actually hurt F1. So this round tries the lever that hasn''t been tried yet:
+  a worked few-shot example showing several clauses about the same failing dimension collapsing into ONE
+  facet, never duplicated -- the same prose-failed/example-succeeded pattern gb6 itself used to fix the
+  exclusion rule after prose alone failed there. (2) Two other worst reviews (B08FLKHG8J#11 ''Great product.
+  Very sharp and well made.'' and B07H2QFN7W#2 ''they fix perfect and look so handsome'') return a totally
+  empty prediction despite containing clear, if brief, positive claims. Both are short and generically
+  phrased, resembling the one existing trivial-review-to-empty example (''Love it!!! Five stars.''), which
+  appears to be over-generalizing to any short positive review. This also partly explains why ''appearance''
+  remains the single largest missed-facet mass (15) despite gb6''s dedicated salience-protection rule:
+  B07H2QFN7W#2''s missed appearance facet looks like a casualty of this emptying-out behavior rather than
+  of facet-cap pruning. Added a clarifying sentence distinguishing truly contentless short reviews from
+  short-but-specific ones, plus a worked few-shot example of the latter. (3) ''effectiveness'' is the
+  2nd-largest FP name (13, vs only 3 matching FN), and B004PBIKHU#1 shows a concrete cause: gold calls
+  the dimension ''performance'', the model outputs ''effectiveness'' -- a near-synonym pair the 0.80 cosine
+  threshold is treating as a mismatch. Added ''performance'' as an explicit synonym in the effectiveness
+  definition, a low-risk naming-alignment fix per the semantic-matching note that leaves the neighboring
+  durability/build-quality definitions (already reworked in gb6) untouched.'
+change_summary: '1. Facet-cap/empty-list rule: added a sentence distinguishing short-but-specific reviews
+  from truly contentless ones -- a one-sentence review can still carry a concrete claim and must not be
+  emptied out just because it''s brief or generically enthusiastic; the empty list is reserved for reviews
+  with no specific claim beyond a bare rating or generic enthusiasm. Targets B08FLKHG8J#11 and B07H2QFN7W#2
+  (both f1=0.0, empty prediction despite real gold content) and partly appearance''s continued FN mass
+  (15).
+
+
+  2. Specific-dimension rule: added "performance" as an explicit synonym inside the effectiveness definition.
+  Targets effectiveness''s 2nd-largest FP mass (13 vs only 3 matching FN) and B004PBIKHU#1''s performance/effectiveness
+  naming mismatch.
+
+
+  3. Added few-shot example 11 (short knife review, synthetic): demonstrates that a brief, casually-phrased
+  positive review can still contain two distinct extractable facets and must not default to an empty list.
+  Reinforces edit 1, contrasting with existing example 2''s genuinely contentless case.
+
+
+  4. Added few-shot example 12 (backpack zipper review, synthetic): demonstrates three separate clauses
+  about the same failing dimension consolidating into ONE facet (never duplicated), alongside one distinct
+  co-occurring facet. Targets B01N2U5J5U#1 and B08NV5452X#3''s literal facet-name duplication (4x and
+  5x respectively), the dominant driver of the ''build quality'' and ''fit'' FP counts in those two reviews,
+  via a worked example rather than repeating gb7''s failed CONSOLIDATE-prose approach.'
+version: gb9
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'build quality', 'sizing accuracy', 'ease of use'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and anything about buying or owning the product rather than the product itself. Specifically exclude: the price paid, value for money, cost, and whether it's "worth it" or a "reasonable price"; listing/description accuracy; and customer service in any form -- support responsiveness, replacement-parts availability, warranty handling, how fast or slow the seller/manufacturer replied. If a sentence mixes a real product complaint with a service/support complaint (e.g. "the charger stopped working and support never replied"), extract only the product part. The RELATIVE LENGTH of a complaint does not decide what to extract: a single short clause naming a genuine product detail is still extractable even if it's buried inside a much longer listing/seller/shipping/service complaint, and a long service or support complaint is still fully excluded even if it dominates the review -- judge each clause by what it's about, not by how much of the review it takes up.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names; never a named character, person, actor, or title -- for books, movies, and other creative works, name the CRAFT dimension being judged instead: 'plot', 'characters', 'writing quality', 'content quality', 'pacing', 'engagement' (how compelling or hard to put down it is), 'emotional impact' (how moving or affecting it is), 'humor' (how funny it is), 'video quality', 'audio quality' -- never the character's, author's, or performer's name.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - CONSOLIDATE: if several sentences all describe the same underlying dimension (e.g. multiple specific examples of the product working, or not working, as intended), report ONE facet for that dimension, not one per example. Most reviews need only 1-3 facets; use more only when the review clearly discusses several distinct dimensions.
+  - Name the SPECIFIC dimension the review is actually about -- 'installation', 'assembly', 'adjustability', 'cord length', 'cup size', 'subtitles', 'ingredient transparency', 'included accessories' are all better facets than a vague bucket term when the review is clearly about that specific thing. Only fall back to one of these broad names when the review is genuinely about the general quality and no more specific name fits: effectiveness (does it achieve its core purpose -- also use this when the review calls it "performance"), functionality (do its features work as intended), reliability (does it keep working, without failing or breaking down, across repeated use), build quality (construction, sturdiness -- including a ONE-TIME breakage, crack, or falling apart, e.g. "fell apart as I unpacked it"), durability (holds up over an EXTENDED period of repeated wear or use -- only use this when the review itself frames it that way, e.g. "after six months of daily use"; a single immediate failure is build quality, not durability), appearance (look, style, design, color, finish -- these are all the same dimension; any visual/cosmetic remark, even a brief aside like "it was pretty" or "looks like quality", is appearance and must not be dropped from the output just because another facet in the same review seems more substantial), size (actual physical dimensions), sizing accuracy (fit relative to the size ordered), ease of use (day-to-day operation, not a one-time setup step like installation or assembly), material, comfort.
+  - Deduplicate facets: never output the same facet name twice in one review, even if it comes up in several sentences (see CONSOLIDATE). Before returning your answer, re-scan the facet list you are about to output and merge or remove any repeated name -- this check is mandatory even when you're confident you already deduplicated while composing. At most 6 facets, the most salient. If the review discusses no concrete product dimension, return an empty list. A SHORT review is not automatically a contentless one: a single sentence can still carry a specific, extractable claim ('very sharp and well made', 'fits perfect and looks great') and must not be emptied out just because it's brief or generically enthusiastic -- reserve the empty list for reviews with no specific claim at all beyond a bare rating or generic enthusiasm ('Love it!!! Five stars.', 'Best purchase ever.').
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender chops ice, purees soup, and crushes frozen fruit without any hiccups - it just works every time. It feels solid and heavy, not flimsy at all, and looks sleek on the counter in brushed steel. It came with two extra jars and a recipe booklet, which was a nice surprise. A bit pricey, but worth it for how well it's built.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: chops ice, purees soup, and crushes frozen fruit without any hiccups
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and heavy, not flimsy at all
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter in brushed steel
+    - facet: included accessories
+      polarity: positive
+      evidence: came with two extra jars and a recipe booklet
+- user: |-
+    This drone flies exactly like it's supposed to and hasn't glitched once in three months of daily use. It's way bigger than I expected, taking up my whole shelf. The matte black finish looks cheap, and one of the propellers cracked after a light bump. When I emailed about the crack, support took two weeks to reply and never sent a replacement.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: flies exactly like it's supposed to
+    - facet: reliability
+      polarity: positive
+      evidence: hasn't glitched once in three months of daily use
+    - facet: size
+      polarity: neutral
+      evidence: way bigger than I expected, taking up my whole shelf
+    - facet: appearance
+      polarity: negative
+      evidence: matte black finish looks cheap
+    - facet: build quality
+      polarity: negative
+      evidence: one of the propellers cracked after a light bump
+- user: |-
+    This mystery kept me flipping pages until 2am - the twists are clever and never cheap. The detective is stubborn and funny in a way that feels real, and by the ending I actually cared what happened to her. My only complaint is the prose gets clunky in the middle third, some sentences you have to reread twice.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: the twists are clever and never cheap
+    - facet: characters
+      polarity: positive
+      evidence: The detective is stubborn and funny in a way that feels real
+    - facet: writing quality
+      polarity: negative
+      evidence: the prose gets clunky in the middle third
+- user: |-
+    The frame went together in about ten minutes, no tools missing and the instructions were clear. Once assembled it's sturdy and doesn't wobble at all. I did email about a missing bolt and it took three weeks and two follow-ups to get a response, which was annoying.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: The frame went together in about ten minutes, no tools missing and the instructions were
+        clear
+    - facet: build quality
+      polarity: positive
+      evidence: it's sturdy and doesn't wobble at all
+- user: |-
+    I devoured this memoir in two nights, could not put it down. The chapter about her college roommate had me laughing so hard I read it out loud to my husband twice. By the final chapters I was properly crying though, that ending really got me. The author's voice is warm and easy to read too.
+  assistant:
+    aspects:
+    - facet: engagement
+      polarity: positive
+      evidence: devoured this memoir in two nights, could not put it down
+    - facet: humor
+      polarity: positive
+      evidence: had me laughing so hard I read it out loud to my husband twice
+    - facet: emotional impact
+      polarity: positive
+      evidence: I was properly crying though, that ending really got me
+    - facet: writing quality
+      polarity: positive
+      evidence: author's voice is warm and easy to read
+- user: |-
+    Really disappointed with this whole order. The listing says it comes in a set of 4 but I only received 2, and when I emailed the seller about it they took a week to even respond. On top of that it arrived two days late. The one thing that did work out is the clip itself - it snaps on tight and hasn't slipped once.
+  assistant:
+    aspects:
+    - facet: clip strength
+      polarity: positive
+      evidence: it snaps on tight and hasn't slipped once
+- user: |-
+    Great little knife. Razor sharp and feels solid in the hand.
+  assistant:
+    aspects:
+    - facet: sharpness
+      polarity: positive
+      evidence: Razor sharp
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid in the hand
+- user: |-
+    This backpack's front zipper broke after a week. Then the side pocket zipper jammed too. A month later the main zipper wouldn't close all the way either. Otherwise it holds a lot and the size is perfect for daily use.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: negative
+      evidence: front zipper broke after a week
+    - facet: size
+      polarity: positive
+      evidence: the size is perfect for daily use

@@ -1,0 +1,86 @@
+parent: v2
+created: '2026-07-21'
+status: candidate
+notes: 'Reflection on v2 dev packet (F1 0.469, P 0.420 < R 0.529): (1) canonical general dimension names
+  -- v2 emitted over-specific compounds that miss the 0.80 semantic match; (2) exclusions extended to
+  customer support, listing/description accuracy, cross-product comparisons; ''value'' kept in scope per
+  gold arbitration ruling; (3) media-content rule + book few-shot -- v2 returned empty on a book review;
+  (4) canonical-naming few-shot with support exclusion.'
+version: v3
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Use the most STANDARD, GENERAL name for the dimension, not a compound or mechanism-specific phrase: 'build quality' (not 'plastic quality'), 'effectiveness' (not 'scalp massage effectiveness'), 'ease of use' (not 'one-handed operation'), 'stability' (not 'standing balance'). Two claims about the same dimension are ONE facet.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only. NOT aspects: delivery, shipping, packaging condition, the seller, customer service or support, warranty handling, the listing or description accuracy, comparisons with other products, and the buying or assembly story. 'value' (worth the price) IS a product aspect.
+  - For media products (books, music, movies, games), the content dimensions ARE the product: 'plot', 'characters', 'writing quality', 'sound quality'. Never return an empty list just because the product is a book or recording.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    A hero you'll love to hate and a heroine you root for. The story grips you from page one, though the prose gets repetitive in the middle chapters.
+  assistant:
+    aspects:
+    - facet: characters
+      polarity: positive
+      evidence: A hero you'll love to hate and a heroine you root for
+    - facet: plot
+      polarity: positive
+      evidence: The story grips you from page one
+    - facet: writing quality
+      polarity: negative
+      evidence: the prose gets repetitive in the middle chapters
+- user: |-
+    Extremely powerful washer, quality product at a reasonable price. Customer support never answered my email though.
+  assistant:
+    aspects:
+    - facet: power
+      polarity: positive
+      evidence: Extremely powerful washer
+    - facet: build quality
+      polarity: positive
+      evidence: quality product
+    - facet: value
+      polarity: positive
+      evidence: at a reasonable price

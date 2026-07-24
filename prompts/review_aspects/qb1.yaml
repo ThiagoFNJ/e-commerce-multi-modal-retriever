@@ -1,0 +1,126 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The current prompt (v2, dev F1 0.4985) is dominated by two error patterns visible in the aggregate
+  counts and the worst-scoring reviews. First, a cluster of facet-NAMING mismatches below the 0.80 semantic-match
+  threshold: ''sizing accuracy'' is the single most frequent false positive (13) while ''size'' is the
+  third most frequent missed gold facet (10) -- these are almost certainly the same underlying aspect
+  wearing two different names, and the current few-shot example teaches the wrong one. Similarly ''durability''+''product
+  durability'' (FP 10+7=17) collide with ''build quality'' (missed 15), ''durability'' (missed 3), and
+  ''reliability'' (missed 5) -- three reviews in the packet (B00IN9W73S#5 ''fell apart as I removed from
+  pkg'' -> gold build quality; B01N2U5J5U#1 parts falling off -> gold part fit/stability, predicted ''sturdiness''/''durability'';
+  B07ZHYS7MD#6 stopped charging -> gold reliability, predicted ''charging station durability'') show the
+  model defaulting to ''durability'' for three distinct gold concepts. ''appearance'' is the single largest
+  missed-gold facet (19) and does not appear anywhere in the current few-shot examples, so the model has
+  never been shown the canonical name for visual/aesthetic aspects (multiple worst reviews mention look/color
+  and the model either omits it or invents ''design''/''color accuracy''/''gender neutrality'' instead).
+  ''value for money'' (FP 7) and ''price'' (FP 3) leak through despite the existing price-paid exclusion,
+  because ''worth the money'' judgments are a distinct case not covered by the current wording (see B08NHPQMY5#6,
+  B01LYNZBV3#0). Second, a systemic over-decomposition problem independent of naming: several worst reviews
+  show the model splitting one underlying quality into 4-6 narrow compound facets against 1-2 gold facets
+  (B01LYNZBV3#0: 6 predicted vs 1 gold ''effectiveness''; B0795G58DL#1: 5 vs 4 with no overlap; B01GHVIU70#3:
+  5 vs 2), which directly explains why ''effectiveness'' and ''functionality'' are each missed 10 times
+  -- the model names the sub-detail instead of the umbrella dimension. Finally, B09431D2DX#3 (a book review)
+  scored fp=0/fn=3 with an empty prediction, and ''content quality'' appears in the missed list -- the
+  existing few-shot set (boots, exclamation, sizing, skincare-adjacent Spanish review) contains no narrative/media
+  example, so the model has no template for plot/characters/writing-quality-type facets and defaults to
+  silence. I made the two allowed few-shot changes to fix the highest-confidence naming gap (sizing accuracy->size,
+  reusing evidence already in the example) and the domain gap (added a synthetic book review), and used
+  system rules -- not examples -- for the broader, cross-cutting fixes (build quality/durability/reliability
+  triad, appearance, over-decomposition, value-for-money exclusion, included accessories) since those
+  apply across many product categories rather than one example''s worth of pattern.'
+change_summary: '1. Changed the ''Runs small...'' few-shot example''s facet from ''sizing accuracy'' to
+  ''size'' (and updated the polarity-neutral rule''s inline example to match) -- targets top FP ''sizing
+  accuracy'' (13) colliding with top-3 missed gold ''size'' (10).
+
+  2. Extended the product-intrinsic exclusion rule to explicitly exclude ''whether it''s worth the money''
+  -- targets FP ''value for money'' (7) + ''price'' (3) + observed ''price value'' FP.
+
+  3. Added a rule disambiguating ''build quality'' (assembly/construction, falls apart) vs ''durability''
+  (wear over repeated use) vs ''reliability'' (stops working/malfunctions) -- targets FP ''durability''+''product
+  durability'' (17) colliding with missed ''build quality''+''durability''+''reliability'' (23), evidenced
+  in 3 separate worst-scoring reviews.
+
+  4. Added a rule naming visual/aesthetic aspects ''appearance'' rather than ''design'' or ''color accuracy''
+  -- targets the single largest missed gold facet (19), currently absent from all few-shot examples.
+
+  5. Added a rule against splitting one underlying quality into multiple narrow compound facets, preferring
+  broad canonical names -- targets missed ''effectiveness'' and ''functionality'' (10 each) and the severe
+  over-generation seen in the lowest-scoring reviews (up to 6 predicted vs 1 gold facet).
+
+  6. Added a rule that bundled parts/tools/cables/extras are ''included accessories'' -- targets missed
+  ''included accessories'' (6) + ''included parts'' (2).
+
+  7. Added a new synthetic book-review few-shot example (plot/characters/writing quality, mixed polarity)
+  to cover the narrative-media domain, which had zero representation in the prior four examples and caused
+  a complete miss (fp=0, fn=3) on a book review in the dev set.'
+version: qb1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Prefer the single broadest canonical dimension over several narrow compound ones. A review that spends many sentences explaining one underlying quality is still ONE facet, not several -- e.g. prefer 'effectiveness' or 'functionality' over hyphenated specifics like 'pain relief effectiveness' or 'scalp massage effectiveness'.
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' = how solidly or well the item is made or assembled (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time; 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time.
+  - Visual/aesthetic look -- how it looks, its color, its style -- is 'appearance', not 'design' or 'color accuracy', unless the review is specifically comparing the received color/pattern against what was advertised or pictured.
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp

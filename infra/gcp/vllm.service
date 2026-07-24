@@ -1,0 +1,17 @@
+[Unit]
+Description=vLLM OpenAI-compatible server (gemma-4-12B, BF16)
+After=network-online.target
+
+[Service]
+ExecStart=/opt/emmr/venv/bin/vllm serve google/gemma-4-12B-it \
+  --dtype bfloat16 \
+  --max-model-len 4096 \
+  --chat-template /opt/emmr/repo/infra/gcp/gemma_chat_template.jinja \
+  --gpu-memory-utilization 0.92 \
+  --port 8000
+Restart=always
+RestartSec=10
+Environment=HF_HUB_OFFLINE=0
+
+[Install]
+WantedBy=multi-user.target

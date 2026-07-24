@@ -1,0 +1,181 @@
+parent: qe2
+created: '2026-07-22'
+status: candidate
+model: qwen3:8b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'qe2 fixed the appearance/build-quality recall gap that qe1 and v2 struggled with (build quality
+  misses fell from 20 to 9), but the FP list shows the dominant failure has shifted to a single new mass:
+  ''functionality'' is now the top false positive by a huge margin (52 -- more than double the next entry)
+  and it is visible in nearly every worst-scoring review as a lazy default whenever the model senses ''the
+  product does its job'', crowding out the actual specific gold facet: B07FCR3316#2 (gold heat management/transfer
+  speed/reliability -> pred includes ''functionality''), B01BPJLC6U#0 (gold sturdiness/portability ->
+  pred ''functionality''), B00MFYQJ0O#6 (gold organization/mounting design/ease of attachment -> pred
+  ''functionality''), B096NCTTV5#3 (gold versatility/cup size/appearance -> pred ''functionality''), B01MAYNX9T#3
+  (gold suction/stability/ease of use -> pred ''functionality''), B085KZGS5S#4 (gold design/clip strength
+  -> pred ''functionality''), B00ILUP0VU#12 (gold hand alignment -> pred ''functionality''). This is the
+  qe2 canonical-naming rule over-generalizing: it told the model to prefer ''functionality'' over compounds
+  like ''cleaning power'', and the model now applies that preference to essentially any performance-adjacent
+  statement instead of only to genuine ''do the promised features work'' claims. The fix narrows the rule
+  to an explicit allow-list of specific mechanism names the review evidence shows gold actually wants
+  (suction, stability, mounting, heat management, transfer speed, cord/wiring, hand alignment, software,
+  compatibility, ease of use/attachment/cleaning) and states functionality is reserved for holistic claims
+  only. The second largest FP mass, ''value for money'' (22), shows the qe2 reword did not fully close
+  the leak -- B002L3TS5M#11 is the one dev case where ''value'' legitimately appears in gold, but the
+  FP volume elsewhere is 22x that single case, so the exclusion is broadened to cover bare cost words
+  (''cheap'', ''pricey'') and dollar amounts, not just quality-framed cost judgments. ''customer service''
+  (6 FP) plus B07ZHYS7MD#6 (gold reliability -> pred battery life/customer support/response time/communication)
+  show the existing seller-exclusion rule doesn''t generalize to synonyms of ''customer service'' the
+  model actually produces, so the rule is broadened to name those synonyms explicitly. Two duplicate-emission
+  bugs appear directly in the worst-reviews evidence -- B00NYAD2J4#4 predicts ''appearance'' twice (neutral
+  and positive) and B07ZCZ4D2T#8 predicts ''appearance'' twice (negative, negative) -- so the existing
+  one-word ''Deduplicate'' instruction is strengthened to explicitly forbid repeating a facet name and
+  to say how to merge conflicting sentiment. The B07ZCZ4D2T#8 case also reveals a naming gap: gold wants
+  ''condition'' (physical damage: ''burned'', ''ruined'') but the model calls it ''appearance'' twice,
+  because v2/qe2''s appearance rule only ever described aesthetic design, never physical damage -- so
+  a new ''condition'' facet is introduced and explicitly distinguished from ''appearance''. Finally, ''reliability''
+  is now the second-largest missed gold facet (7, e.g. B07QLB52VJ#7, B07ZHYS7MD#6, B07X4VJSNC#6) and never
+  appears anywhere in the prompt''s vocabulary, so it is added as a canonical facet name distinct from
+  both ''build quality'' (solidity now) and ''durability'' (wearing down over time) -- it covers ''stops
+  working / fails / breaks down'' language. All 6 existing few-shot examples are kept unchanged since
+  the evidence shows they are working (build quality/durability distinction, size/fit distinction, price
+  exclusion all improved under qe2); two new synthetic examples are added (staying within the two-example-change
+  budget) to put the functionality-narrowing rule, the reliability facet, the condition/appearance split,
+  and the broadened service/price exclusions into a worked context rather than only prose, since qe1''s
+  prose-only ''usage cues'' rule regressed score while qe2''s worked examples improved it.'
+change_summary: '1. Narrowed the ''functionality'' canonical-naming rule from a general preference into
+  a restricted allow-list: functionality is reserved for holistic ''promised features work at all'' claims
+  only, and the rule now lists the specific mechanism names (suction, stability, mounting, heat management,
+  transfer speed, cord/wiring, hand alignment, software, compatibility, ease of use/attachment/cleaning)
+  the model must use instead when the review implies them -- targets the single largest FP mass (52, more
+  than double the next category) visible across most of the worst-scoring reviews. 2. Added ''reliability''
+  as an explicit canonical facet (keeps working without failing/breaking/malfunctioning, distinct from
+  build quality and durability) -- targets the second-largest missed-gold category (7) which had zero
+  coverage in the prompt. 3. Broadened the money-exclusion clause to cover bare cost words (''cheap'',
+  ''pricey'') and dollar amounts, not only quality-framed judgments -- ''value for money'' FP (22) shows
+  the qe2 reword only partially closed this leak. 4. Broadened the seller/service exclusion to explicitly
+  name synonyms the model actually produces (customer support, technical support, response time, communication,
+  warranty claims) -- targets 6 ''customer service'' FPs plus the B07ZHYS7MD#6 miscategorization. 5. Split
+  ''appearance'' (aesthetic design: color/style/finish) from a new ''condition'' facet (physical damage/defects
+  on arrival: cracked/scratched/burned/broken) -- B07ZCZ4D2T#8 shows the model emitting ''appearance''
+  twice for what gold calls ''condition'', a pure naming gap. 6. Strengthened the one-word ''Deduplicate''
+  rule into an explicit no-repeat-facet-name instruction with merge guidance -- two worst-scoring reviews
+  (B00NYAD2J4#4, B07ZCZ4D2T#8) show the model currently emitting the same facet name twice with different
+  polarities. 7. Added new few-shot example 7 (phone mount): demonstrates specific-mechanism naming (suction,
+  stability) instead of the functionality catch-all, plus ''reliability'' for a part failing over time.
+  8. Added new few-shot example 8 (damaged electronics case): demonstrates condition vs. appearance as
+  separate facets, excludes customer-support and price mentions per the broadened rule, and shows a correctly-scoped
+  ''functionality'' use (holistic ''everything works''). All 6 existing examples unchanged.'
+version: qe3
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'appearance', 'build quality', 'reliability'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and any interaction with the seller or manufacturer after purchase -- customer service, customer support, technical support, response time to inquiries, communication, warranty claims -- none of these are aspects of the product itself. Also ignore money entirely: any mention of cost, price, or affordability ('worth it', 'good value', 'reasonable price', 'overpriced', 'expensive', 'cheap', 'pricey', a dollar amount) never creates a 'value', 'value for money', or 'price' facet, even when cost is framed as a quality judgment.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - How the product looks BY DESIGN (color, style, aesthetics, finish) is 'appearance' -- a common dimension that is easy to miss when the review is mostly praise ("looks great", "love the look"). Damage, defects, or physical state on arrival (cracked, scratched, burned, broken, stained, dirty) is a different facet, 'condition' -- never call physical damage 'appearance'.
+  - Items or parts bundled with the product are 'included accessories'.
+  - Prefer generic canonical names over task-specific compounds so near-synonyms don't fragment: 'effectiveness' (not 'cleaning power', 'scalp massage effectiveness'), 'size' for whether the product's own dimensions/capacity are adequate (not 'sizing accuracy', which is reserved for whether the ordered size runs true to expectation), 'build quality' for how solid or well-assembled the product feels right now (distinct from 'durability', which is specifically about holding up over time), 'reliability' for whether the product keeps working without failing, breaking, or malfunctioning over time (a part slipping loose, a device dying, intermittent glitches -- distinct from both 'build quality' and 'durability'). 'functionality' is NOT a catch-all default -- use it ONLY for a holistic 'do the promised features work at all' claim when no more specific attribute is mentioned. If the review names or clearly implies a specific mechanism instead -- suction, grip/traction, stability, mounting, heat management, transfer speed, cord/wiring, hand/needle alignment, software, compatibility, ease of use, ease of attachment, ease of cleaning -- use that specific name, not 'functionality'.
+  - Facets apply to any product type, including media (books, movies, games): 'plot', 'characters', 'writing quality' are valid facets under the same schema.
+  - Deduplicate facets: never output the same facet name twice in one response, even if the review expresses mixed or conflicting opinions about it -- merge into a single entry (pick the dominant sentiment, or 'neutral' if genuinely mixed). At most 6 facets, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender looks sleek on the counter and matches the rest of my kitchen. It came with three different-sized jars and a recipe booklet, which was a nice bonus. The plastic base feels flimsy and rattles a bit at high speed, and after about six weeks of daily use one of the gears started grinding and it eventually stopped turning on. When it did work, it pureed frozen fruit smoothly every time.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter
+    - facet: included accessories
+      polarity: positive
+      evidence: came with three different-sized jars and a recipe booklet
+    - facet: build quality
+      polarity: negative
+      evidence: plastic base feels flimsy and rattles a bit at high speed
+    - facet: durability
+      polarity: negative
+      evidence: after about six weeks of daily use one of the gears started grinding and it eventually
+        stopped turning on
+    - facet: effectiveness
+      polarity: positive
+      evidence: pureed frozen fruit smoothly every time
+- user: |-
+    The screen is honestly a bit too small for comfortable reading, though the included stand fits it perfectly and holds it at a nice angle. It was pricier than I expected, but every feature promised in the listing actually works as advertised.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: a bit too small for comfortable reading
+    - facet: fit
+      polarity: positive
+      evidence: the included stand fits it perfectly and holds it at a nice angle
+    - facet: functionality
+      polarity: positive
+      evidence: every feature promised in the listing actually works as advertised
+- user: |-
+    This phone mount has incredible suction and never loses its grip on the dashboard, even over bumps, so my phone stays perfectly stable for the whole drive. Sadly, after about a month the ball joint started slipping and now it droops down no matter how tight I turn it -- feels like something inside just gave out.
+  assistant:
+    aspects:
+    - facet: suction
+      polarity: positive
+      evidence: incredible suction and never loses its grip
+    - facet: stability
+      polarity: positive
+      evidence: phone stays perfectly stable for the whole drive
+    - facet: reliability
+      polarity: negative
+      evidence: the ball joint started slipping ... feels like something inside just gave out
+- user: |-
+    The package arrived with the corner of the case cracked and one panel scratched, so it didn't look new out of the box, but the color and finish are exactly the elegant matte black shown in the pictures. I emailed support about the crack and they never responded, which was frustrating. It's a bit pricey for what it is, but I'm keeping it since everything works.
+  assistant:
+    aspects:
+    - facet: condition
+      polarity: negative
+      evidence: the corner of the case cracked and one panel scratched
+    - facet: appearance
+      polarity: positive
+      evidence: the color and finish are exactly the elegant matte black shown in the pictures
+    - facet: functionality
+      polarity: positive
+      evidence: everything works

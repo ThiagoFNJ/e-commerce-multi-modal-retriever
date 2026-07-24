@@ -1,0 +1,163 @@
+parent: gm1
+created: '2026-07-22'
+status: candidate
+model: gemma4:12b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'gm1''s own edits became this round''s biggest problem: the consolidation/preferred-term rules
+  it added made ''build quality'' (FP 33) and ''functionality'' (FP 29) the two largest error masses by
+  far, and ''durability'' (12), ''appearance'' (11), ''effectiveness'' (10) and ''reliability'' (8) all
+  inflated too -- the model is now defaulting to this small set of six generic labels for almost any review,
+  in domains where they don''t belong. The worst-scoring reviews show this concretely: a skincare review
+  gets ''build quality'' for a face reaction (gold: moisturizing/skin compatibility), a phone mount and
+  an LED strobe both get ''functionality''+''build quality'' instead of gold''s suction/stability/sturdiness/portability,
+  a pressure washer gets ''performance'' instead of gold''s ''power'', and four separate book reviews
+  get ''effectiveness''/''narrative quality''/''writing style'' instead of gold''s plot/characters/writing
+  quality/humor/engagement/emotional impact/excitement -- a whole domain (creative/media works) where
+  none of the physical-product vocabulary should ever fire. ''performance'' (FP 6) matches zero gold facets
+  in the missed list, so it is pure waste and should be banned outright in favor of a specific replacement.
+  On the missed side, ''design'' (FN 6) is the second-largest gap and is visible directly in two worst-scoring
+  reviews where the model said ''appearance'' but gold wanted ''design'' (''Beautiful design'' and the
+  clip-holder review) -- these are apparently distinct facets in the gold vocabulary, not synonyms, so
+  ''design'' needs its own definition rather than being folded into ''appearance''. ''material'' (FN 5)
+  is also being swallowed by the over-broad ''build quality'' definition (which explicitly said ''or materials''
+  after last round''s edit) -- one worst-scoring review (''Great material!! Holds up really good.'') shows
+  gold wants ''material'' and ''durability'' as two separate facets, neither of which is ''build quality''.
+  All of these are lookup/scoping fixes: the model isn''t reasoning incorrectly, it''s over-applying the
+  very consolidation and preferred-term rules gm1 introduced, so this round''s edits tighten scope (when
+  to consolidate, when a physical-product term may not apply) and add missing distinctions (design vs.
+  appearance, material vs. build quality) rather than adding new mechanisms. I also added one general
+  catch-all sentence pointing at the review''s own vocabulary for the smaller residual missed facets (installation,
+  fit, condition, style, thickness, scratch resistance, ease of cleaning) since there isn''t enough evidence
+  here to justify a dedicated rule per term, but there is a clear pattern that the model needs permission
+  to use vocabulary outside the fixed list. For the two few-shot changes (within the 2-example budget):
+  I rewrote the Spanish example''s ''build quality'' facet to ''material'' since it was actively teaching
+  a labeling choice that now contradicts the new material/build-quality split, and I added one new synthetic
+  webcam review dense enough to demonstrate specific-mechanism naming (autofocus, image quality) over
+  generic labels, the design/material/build-quality three-way split, and a restrained, correct use of
+  ''reliability'', without copying any development review.'
+change_summary: 'Added a ''prefer specific over generic'' rule restricting effectiveness/functionality/reliability
+  to cases with no more specific mechanism to name, and banning ''performance'' outright -- targets the
+  two largest error masses (build quality FP33, functionality FP29) plus durability/appearance/effectiveness/reliability/performance
+  FP inflation, evidenced in the phone-mount, LED-strobe, tea-infuser, and pressure-washer worst-scoring
+  reviews.
+
+  Scoped the long-testimonial consolidation rule to reviews with no other distinct concrete dimension,
+  and added a rule that effectiveness/durability/build quality/material never apply to creative or informational
+  works, redirecting them to plot/characters/writing quality/pacing/humor/engagement/emotional impact/entertainment
+  value -- targets four of the twenty worst-scoring reviews, all books, that got ''effectiveness''/''narrative
+  quality''/''writing style'' instead of gold''s narrative-specific facets.
+
+  Split ''material'' out of ''build quality'' with its own definition (substance/fabric feel vs. assembly/construction/defects)
+  -- targets missed gold facet ''material'' (FN5) and the ''Great material!! Holds up really good.'' worst-scoring
+  review where gold wants material+durability, not build quality.
+
+  Added ''design'' as a new preferred term distinct from ''appearance'' (overall styling/shape as a considered
+  design choice vs. general visual impression/finish) -- targets missed gold facet ''design'' (FN6, the
+  second-largest gap), seen directly in the ''Beautiful design'' and picture-clip worst-scoring reviews
+  where the model said ''appearance''.
+
+  Added a closing catch-all rule to use the review''s own vocabulary for dimensions not covered by the
+  fixed terms (installation, fit, condition, style, thickness, scratch resistance, ease of cleaning) --
+  targets the residual smaller missed-facet masses without inventing unevidenced dedicated rules for each.
+
+  Rewrote the Spanish few-shot example''s facet from ''build quality'' to ''material'' (same evidence/polarity)
+  so it stops contradicting the new material/build-quality split.
+
+  Added one new synthetic few-shot example (webcam review) demonstrating specific-mechanism naming over
+  generic labels, the design/material/build-quality three-way split, and correct restrained use of ''reliability'',
+  without copying any development-set text.'
+version: gm2
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION or discrete COMPONENT of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'camera', 'speaker'. If several components share one complaint (e.g. multiple panels that all fit badly), name the shared dimension once ('fitment', 'build quality') rather than each part; name a specific component only when its opinion is genuinely distinct from the rest.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+  - Prefer the most specific concrete facet the review actually supports over a broad outcome facet. Reach for 'effectiveness', 'functionality', or 'reliability' only when the review gives no more specific mechanism, feature, or quality to name -- if it names one (suction, stability, sturdiness, portability, power, battery life, software, versatility, brewing quality, and so on), use that specific term instead. Never use 'performance' as a facet: always name the specific thing that performed well or badly (power, speed, brewing quality, accuracy, ...).
+  - When a review makes many small observations that all serve one underlying theme (a long testimonial on whether a workout, tool, or treatment worked as intended) AND names no other distinct concrete dimension, extract ONE facet for that theme instead of several fine-grained ones that fragment it. Use 'effectiveness' for "does it work as intended / produce the desired result"; 'functionality' for "do its features or mechanisms operate as designed"; 'reliability' for "is it consistent, or does it fail/glitch across repeated use". Do not apply this consolidation to a short review that already names 1-3 distinct concrete dimensions -- extract those directly instead.
+  - 'effectiveness', 'durability', 'build quality', and 'material' describe physical products or products applied to the body, and never apply to creative or informational works (books, movies, shows, music, articles). For those, use dimensions such as 'plot', 'characters', 'writing quality', 'pacing', 'humor', 'engagement', 'emotional impact', or 'entertainment value' instead.
+  - Preferred terms for near-synonyms (matching is by semantic similarity, so use the left term, not the one on the right): 'appearance' for a general visual impression, finish, print, or color effect that is not framed as a design choice; 'design' for the product's overall styling, shape, or aesthetic/ergonomic design as a considered choice ('beautiful design', 'sleek design', 'well-designed'); 'material' for the substance or fabric itself judged on its own feel or quality ('great material', 'feels like cheap plastic'), kept separate from 'build quality', which is how well the product is assembled or constructed -- workmanship, structural integrity, parts fitting together, or defects, including out-of-box defects; 'durability' only for wear or longevity claims over extended time or repeated use, never for immediate/out-of-box defects; 'size' for a non-wearable object's physical dimensions being too big or small for its purpose; 'sizing accuracy' only for how a wearable item runs relative to its labeled or expected size; 'included accessories' for extra items, tools, or parts bundled with the product.
+  - If none of the terms above fit, name the dimension using the review's own vocabulary (e.g. 'installation', 'fit', 'condition', 'style', 'thickness', 'scratch resistance', 'ease of cleaning') rather than forcing it into one of the broad terms above.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    I bought this vibrating foam roller for my chronic calf tightness, and it's honestly done more for me in a month than years of stretching ever did — I can finally touch my toes again. It also looks sleek on my shelf and came with a mesh carrying bag, which was a nice bonus. Six months of near-daily use later it still holds its charge and works like day one, though the power button felt a little wobbly right out of the box.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: done more for me in a month than years of stretching ever did
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on my shelf
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a mesh carrying bag
+    - facet: durability
+      polarity: positive
+      evidence: Six months of near-daily use later it still holds its charge and works like day one
+    - facet: build quality
+      polarity: negative
+      evidence: the power button felt a little wobbly right out of the box
+- user: |-
+    This webcam's autofocus locks on fast and the video looks crisp even in dim light. The clip has a sleek, minimalist design that matches my monitor, and the aluminum body feels solid in the hand. My only complaint is the app crashes about once a week and I have to unplug and replug the camera to get the feed back.
+  assistant:
+    aspects:
+    - facet: autofocus
+      polarity: positive
+      evidence: autofocus locks on fast
+    - facet: image quality
+      polarity: positive
+      evidence: the video looks crisp even in dim light
+    - facet: design
+      polarity: positive
+      evidence: sleek, minimalist design that matches my monitor
+    - facet: build quality
+      polarity: positive
+      evidence: the aluminum body feels solid in the hand
+    - facet: reliability
+      polarity: negative
+      evidence: the app crashes about once a week and I have to unplug and replug the camera to get the
+        feed back

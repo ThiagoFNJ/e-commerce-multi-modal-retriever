@@ -1,8 +1,8 @@
 # System Design — E-Commerce Multi-Modal Retriever
 
 Status: **draft**. Specifies the retrieval architecture and the engineering rationale for
-each choice. The Review Aspect Pipeline internals are left open pending a separate design
-pass grounded in current practice.
+each choice. The review channel's original LLM-extraction design was built, piloted, and
+retired as measured-infeasible (§2.1); the channel is per-sentence chunk embedding (§2).
 
 ---
 
@@ -48,83 +48,80 @@ Qdrant provides for multivectors, which constrains §2.
 
 ---
 
-## 2. Review aspect pipeline — Key Point Analysis with neutral facets
+## 2. Review channel — per-sentence chunk embedding
 
-The review multivector is built by a Key Point Analysis (KPA)-style pipeline: condense reviews
-into a bounded, deduplicated, salience-ranked set of neutral aspect facets. KPA is the
-canonical "many reviews → bounded salient set" operation (IBM Project Debater; Bar-Haim et
-al.), and underlies commercial "customers say" features. This design adopts KPA's *concept*
-but not its original supervised key-point-matching model.
+**Decision.** Every review of every product enters the index. Reviews are split into
+sentences; each sentence is embedded by the shared dense encoder (§3), and the product's
+review field is upserted as an `[n_sentences, d]` multivector scored with `MAX_SIM`. There
+is no LLM in the ingestion path and no sampling — the ≤13-review scraper ceiling is the
+only cap.
 
-Each product has at most ~13 scraped reviews — too few to mine a stable vocabulary or a
-meaningful salience count per product. So aspects are mined at the **category level** and
-matched down to products (collective KPA).
+**No sampling.** A first-k cut (e.g. 5 of ≤13 reviews) was considered as a cost lever and
+rejected: a channel presented as "signal from reviews" cannot silently discard the majority
+of the reviews that could promote or demote a product's relevance. The review channel is
+computed from the full review set or not at all.
 
-**Granularity: adaptive backoff (1k floor).** Each product's vocabulary is mined at the
-deepest category-tree node whose bucket holds **≥ 1,000 reviews**; a bucket too thin at a
-given depth backs off to its parent (review count only shrinks with depth, so there is one
-crossing point). This mirrors Katz/stupid backoff in n-gram models: descend for coherence,
-back off for a reliable estimate. Measured on the corpus, a 1k floor places ~90% of products
-at tree depth ≥ 3 (aspect-coherent buckets); the ~7.8% of products with no category fall to a
-single **global** bucket.
+**Sentence grain.** A review makes several claims about several dimensions; one vector per
+review averages them together, while `MAX_SIM` is precisely the comparator for "the query
+matches *some* claim". Sentences are the cheapest unit approximating one claim per row.
+Measured on a 50k-review sample (split at sentence punctuation, ≥15-char floor): mean 4.45
+sentences/review (median 3, p95 13), mean 80 chars — well inside the encoder window.
+Corpus-wide (3,962,238 reviews) that projects to **~17.6M sentence vectors**: 25.2 GiB
+fp32, **6.3 GiB int8-quantized**. The field is Stage-2 only (§6), so it is indexed with
+`hnsw_m=0` like the optional ColBERT field — no ANN graph over 17.6M rows, scoring only
+against the ≤40 candidates. A **whole-review-as-one-vector** variant (3.96M rows, ~5.7 GiB
+fp32) is retained as the grain control.
 
-**Pipeline (offline, at ingestion).**
-1. **Assign.** Route each product to its adaptive-backoff bucket (or the global bucket).
-2. **Mine (per bucket).** From the bucket's ≥1k reviews, extract candidate aspects, dedup, and
-   name them into a canonical set of **polarity-neutral facet phrases** — "arch support",
-   "waterproofing", "sizing accuracy". Each facet carries a **category-level salience** = its
-   matching-review count in the bucket (a real count now, since the bucket is data-rich).
-   Mechanism: LLM aspect extraction + embedding clustering/naming (distant-supervised, no
-   labels). Runs **once per bucket** (a few thousand buckets), not per product.
-3. **Match (per product).** Match the bucket vocabulary against the product's ≤13 reviews by
-   cosine in the **shared dense encoder** space (§3); keep the **top-K** facets the product
-   actually expresses, ranked by product-level support → a K×d matrix, upsert as the review
-   multivector.
+**Ingestion hygiene.** (a) *Language:* BGE-small is English-only and the corpus contains
+non-English reviews; sentences are language-filtered before embedding and the drop rate is
+reported. (b) *Length floor* ≥15 chars: fragments ("Love it!") cost a row without stating a
+claim; 4.2% of reviews yield zero sentences and simply contribute no rows — absence is not
+a zero vector (§7). (c) *Dedup:* exact-duplicate sentences within a product collapse to one
+row.
 
-Facets are embedded verbatim by the shared dense encoder — not representative sentences, not
-signed opinions. Vocabularies and extractions are cached per bucket. A
-**whole-review-as-one-vector** variant is retained as a control, to confirm the aspect
-pipeline earns its cost over the reference implementation's fallback.
+**Cardinality caveat — now load-bearing.** `MAX_SIM` does not normalize by row count, and a
+maximum over more rows is stochastically larger, so row-rich products are favored
+independent of relevance. The retired design bounded this with a curated top-K; raw
+sentences vary from 1 to ~170 rows per product (13 reviews × p95 13 sentences).
+`corr(n_rows, rank)` is measured first; if the effect is material, the corrections
+evaluated are `log(n_rows)` score normalization and mean-of-max, as fusion variants (§5).
 
-**Polarity is extracted but quarantined.** The LLM also emits a polarity per facet, stored as
-**per-aspect metadata** — never in the embedded string and never in the score. Two reasons.
-(a) *Task scope:* ESCI relevance is a topical match, not product quality, so penalizing a
-product by review sentiment fights the ground-truth labels. (b) *Mechanics:* text encoders
-do not separate "X" from "not X" (negation preserves topic, which is what a retrieval encoder
-is trained to capture), and `MAX_SIM` is a maximum that can only reward, so a signed negative
-aspect fused into the embedding *raises* the score for the query it should penalize. Keeping
-polarity as metadata leaves the sentiment ablation runnable later at ~zero extra cost without
-re-extraction; the signed-aspect / sentiment-scoring direction is a **scoped-out alternative**,
-not pursued.
+**Negation caveat.** Text encoders preserve topic, not polarity: "arch support is terrible"
+matches an arch-support query. On ESCI this is aligned with the labels — relevance is
+topical, not product quality — which is the same reason the retired design quarantined
+polarity as metadata. It is documented as a channel property; sentiment-aware scoring stays
+scoped out.
 
-**Salience** is two-level: the **category-level** matching-review count ranks and prunes the
-bucket vocabulary (data-rich, so the count is meaningful); **product-level** support selects
-each product's top-K. It is stored as per-aspect metadata — Qdrant's `MAX_SIM` cannot weight
-rows inside a multivector — for the `corr(n_aspects, rank)` check (below) and any future
-weighted-fusion variant.
+### 2.1 Path taken first — LLM aspect extraction (KPA): measured infeasible
 
-**Canonicalization is intrinsic.** Mining one vocabulary per bucket deduplicates and names
-facets *within* the category, and each product draws only from its own bucket — so no global
-cross-category taxonomy is needed.
+The original review channel was a Key Point Analysis-style pipeline (IBM Project Debater;
+Bar-Haim et al.): every review passed through **Qwen3-8B run locally via Ollama**
+(grammar-constrained JSON) to extract polarity-neutral, product-intrinsic facet phrases;
+facets mined into per-category vocabularies over adaptive-backoff buckets (1k-review floor,
+Katz-style — ~90% of products at tree depth ≥3); each product matched against its bucket's
+vocabulary to form a top-K facet multivector. The engineering was fully built and stays in
+the tree: extraction engine with checkpoint/cache/retry semantics, few-shot prompt v2, a
+600-review gold set with an annotation loop, semantic-match P/R/F1 metrics, and a
+GEPA-style prompt-optimization design — `docs/review-aspect-extraction.md`,
+`src/emmr/reviews/`.
 
-**Rationale.** Extraction runs offline where latency and cost are amortized. Neutral facets
-also **de-risk extraction quality**: the literature reports LLM aspect-term extraction at
-~46–65 F1 but the full aspect+opinion+sentiment triplet at only ~35–54 F1, so dropping the
-sentiment element removes the weakest sub-task. `MAX_SIM` scores increase with the number of
-rows, so unbounded aspect counts would favor products with more aspects independent of
-relevance; a fixed **top-K** bounds this, and the ~13-review scraper ceiling already limits
-the range. `corr(n_aspects, rank)` is measured to confirm the residual effect is small;
-aspects-as-points (Pattern B) remains a fallback if it proves material. Category-level mining
-also collapses cost from ~412k per-product LLM passes to a few thousand per-bucket passes.
+**The throughput pilot retired it.** Measured over 200 corpus-sampled reviews on the
+development machine (Apple Silicon, Ollama, sequential): **5.21 s/review** (0.192
+reviews/s). Extrapolated to the 3,962,238-review corpus: **~239 days** of wall-clock. A
+first-k = 5 cut still leaves ~80 days — and first-k is rejected above independent of cost.
+The constraint is hardware and time frame, not design: single-stream local LLM decoding is
+the wrong tool for a ~4M-document batch job, and moving to a paid API or rented GPUs
+changes the project's cost envelope, not the conclusion.
 
-**Tuning parameters (empirical, not blocking):**
-- **K** — facets per product (start K ≈ 8; bounded by the `MAX_SIM` cardinality argument).
-- **θ** — cosine dedup threshold for the bucket vocabulary.
-- the backoff **floor** — locked at 1k reviews; revisit if buckets prove too coarse or thin.
+Recorded as a **result, not a discard**: the path was designed, built, and priced with a
+measured pilot, and that number is what licenses the cheaper channel above. The
+aspect-annotation release (`review_aspects.parquet` / `product_aspects.parquet`) and an
+extraction-vs-chunking head-to-head remain available as a scoped follow-up on a judged
+subset, where 5.21 s/review is tractable.
 
-**Status: DECIDED (method: KPA; neutral facets; quarantined polarity; adaptive-backoff
-granularity at a 1k floor; two-level count salience; intrinsic canonicalization) · TUNING
-(K, θ).**
+**Status: DECIDED (per-sentence chunk embedding over the full review set; whole-review
+grain control) · RETIRED (LLM aspect extraction — measured infeasible on local hardware:
+5.21 s/review → ~239 days full corpus).**
 
 ---
 
@@ -134,9 +131,9 @@ granularity at a 1k floor; two-level count salience; intrinsic canonicalization)
 
 | Channel | Representation | Encoder | Role |
 |---|---|---|---|
-| product **dense** | single vector over title+bullets+description | shared dense bi-encoder | Stage-1 semantic recall |
+| product **dense** | single vector over title+bullets+description | **BGE-small-en-v1.5** (384-d) | Stage-1 semantic recall |
 | product **lexical** | BM25 sparse | — | Stage-1 exact-term recall |
-| **review** | multivector, row per aspect (`MAX_SIM`) | **same** shared dense encoder | Stage-2 |
+| **review** | multivector, row per review sentence (`MAX_SIM`, `hnsw_m=0`) | **same** shared dense encoder | Stage-2 |
 | **image** | single vector | SigLIP (query = text tower → joint space) | Stage-2 |
 | product **ColBERT** *(optional)* | token multivector, `hnsw_m=0` | ColBERT | Stage-2 rerank only |
 
@@ -158,9 +155,11 @@ granularity at a 1k floor; two-level count salience; intrinsic canonicalization)
 - **Image is a separate space.** SigLIP is multimodal; the query is embedded by its text
   tower into the joint image-text space.
 
-**Open:** the specific dense model (BGE / E5 / GTE-small).
+**Encoder:** `BAAI/bge-small-en-v1.5` — 384-d, ~33M params, CPU-friendly at 447k products,
+a strong MTEB retrieval baseline, and the encoder the reference used for reviews. Uses the
+`query:` / `passage:` prompt convention. Shared across the product-dense and review channels.
 
-**Status: DECIDED (architecture) · OPEN (dense model).**
+**Status: DECIDED.**
 
 ---
 
@@ -178,7 +177,7 @@ component from the query path.
 
 Because the dense encoder is shared (§3), the query is embedded **once** as dense and reused
 for both the product-text and review channels (compared against different fields; against the
-review multivector, `MAX_SIM` yields the best-matching aspect). Online query cost is three
+review multivector, `MAX_SIM` yields the best-matching review sentence). Online query cost is three
 encodings — dense (reused twice), sparse (BM25), and SigLIP-text.
 
 **Status: DECIDED.**
@@ -260,7 +259,9 @@ interaction and redundancy. See `docs/evaluation-plan.md`.
 
 ## 9. Open / deferred
 
-- **Review Aspect Pipeline internals** — separate design pass (§2 parameters: K, θ, polarity,
-  schema).
+- **Review-channel cardinality correction** — measure `corr(n_rows, rank)`; pick none /
+  `log(n_rows)` normalization / mean-of-max (§2).
+- **Extraction-vs-chunking head-to-head** on a judged subset — scoped follow-up to the
+  retired aspect-extraction path (§2.1).
 - **Dense encoder selection** (§3).
 - **Learned fusion** as a scoped research extension (§5), not the core.

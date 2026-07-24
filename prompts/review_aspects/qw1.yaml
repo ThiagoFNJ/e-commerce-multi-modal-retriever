@@ -1,0 +1,112 @@
+parent: v2
+created: '2026-07-22'
+status: candidate
+model: qwen3:14b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Three findings dominate the evidence and are addressed here. (1) The single largest false-positive
+  facet, ''sizing accuracy'' (11 occurrences), is not a model invention -- it is the exact example the
+  current prompt teaches twice, in the facet-definition rule and in the polarity-neutral rule (''runs
+  small'' -> ''sizing accuracy''), and it is also the label used in few-shot example 3. Meanwhile gold''s
+  preferred names for the same dimension, ''size'' (10 missed) and ''fit'' (6 missed), sit near the top
+  of the missed list -- a textbook case of the prompt itself seeding a facet name that the semantic matcher
+  (threshold 0.80) does not treat as a synonym of gold''s vocabulary. Both prompt examples and few-shot
+  example 3 are corrected to ''size''. (2) ''appearance'' is by far the single largest missed-gold bucket
+  (21), while FPs like ''color accuracy'' (7) and part of ''design'' (3) suggest the model is fragmenting
+  look/color/cosmetic-design mentions into narrower phrases instead of the umbrella term gold uses; similarly
+  ''durability''/''product durability'' (17 combined FP) versus missed ''build quality'' (12) shows the
+  model conflating sturdiness/construction with wear-over-time under one label the matcher doesn''t accept
+  as equivalent. A canonical-naming rule is added covering these plus other frequent missed buckets (effectiveness,
+  functionality, reliability, included accessories, installation) and, from the worst-review evidence
+  in book reviews, the narrower narrative-facet inventions (''character chemistry'', ''plot development'',
+  ''story pacing'', ''romantic tension'') that should instead be ''characters'', ''plot'', ''pacing'',
+  ''romance''. (3) Nearly every worst-scoring review shows the model outputting exactly 6 facets (the
+  cap) even when gold lists only 3-4, with the extra slots filled by generic, weakly-grounded facets (''user
+  experience'', ''versatility'', ''additional features'', ''portability'') that appear nowhere in the
+  missed-gold list -- clear evidence of padding toward the cap rather than reporting only what the text
+  supports. The dedup/cap rule is rewritten to explicitly forbid this. A concrete rule violation is also
+  visible in the evidence: the chair review predicts ''shipping speed: positive'' despite the existing
+  shipping-exclusion rule, and ''value for money''/''price'' are pure-hallucination FPs (8 and 5 occurrences,
+  absent from the missed list) -- both are now explicitly excluded. One new synthetic few-shot example
+  was added to demonstrate the corrected ''build quality'' / ''appearance'' / ''included accessories''
+  naming together with the anti-padding and value/shipping-exclusion rules in a single worked case, since
+  the current examples don''t cover an accessories-included or appearance-focused scenario.'
+change_summary: '1) Replaced ''sizing accuracy'' with ''size''/''appearance'' in the two system-prompt
+  illustrative examples (facet definition, polarity-neutral rule) that were directly seeding the #1 false-positive
+  facet name. 2) Strengthened the product-intrinsic rule to explicitly exclude shipping speed/arrival
+  time and ''value for money''/''worth the price'' judgments -- both measured as pure-hallucination FPs.
+  3) Added a new canonical facet-naming rule (appearance, build quality, durability, size, fit, effectiveness,
+  functionality, reliability, included accessories, installation, plot, characters, dialogue, pacing)
+  that targets the largest missed-gold buckets and forbids the narrower compound variants seen in the
+  worst-scoring reviews (sizing accuracy, color accuracy, character chemistry, setup complexity, story
+  pacing, plot development). 4) Rewrote the dedup/cap rule to explicitly forbid padding the list to 6
+  with generic filler facets (user experience, versatility, additional features), directly targeting the
+  padding pattern visible in nearly every worst-scoring review. 5) Rewrote few-shot example 3: facet ''sizing
+  accuracy'' -> ''size'' (same review text, same evidence span). 6) Added one new synthetic few-shot example
+  (gadget case review) demonstrating ''build quality'' / ''appearance'' / ''included accessories'' naming,
+  exclusion of shipping speed and value-for-money framing, and returning only 3 facets instead of padding
+  to the cap.'
+version: qw1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'battery life', 'appearance'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping (including shipping speed and how fast it arrived), packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product. Also ignore 'value for money' / 'worth the price' judgments about cost -- if a specific quality is being praised, name that quality instead of a price judgment.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Facet naming: use the simplest, most generic dimension name that fits, not a narrower compound phrase -- near-synonyms are scored as mismatches against the gold vocabulary. Prefer generic names such as: appearance, build quality, durability, size, fit, effectiveness, functionality, reliability, included accessories, installation, plot, characters, dialogue, pacing. Avoid manufacturing narrower variants of these (e.g. 'sizing accuracy', 'color accuracy', 'character chemistry', 'setup complexity', 'story pacing', 'plot development') when the simple name already captures the dimension.
+  - Deduplicate facets. At most 6, the most salient -- but most reviews genuinely have only 2-4 clear aspects. Never pad the list with generic or weakly-supported facets (e.g. 'user experience', 'versatility', 'additional features') just to approach the cap. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Arrived in two days, super fast! The case itself feels solid and doesn't flex when I squeeze it, but the matte grey finish shows fingerprints constantly and looks smudged five minutes after wiping it down. It came with a spare set of screws and a little cleaning cloth, which was a nice surprise. A bit pricey for what it is, but I don't regret the purchase.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and doesn't flex when I squeeze it
+    - facet: appearance
+      polarity: negative
+      evidence: shows fingerprints constantly and looks smudged
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a spare set of screws and a little cleaning cloth

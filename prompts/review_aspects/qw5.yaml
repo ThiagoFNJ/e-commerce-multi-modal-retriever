@@ -1,0 +1,194 @@
+parent: qw3
+created: '2026-07-22'
+status: candidate
+model: qwen3:14b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'This round''s evidence isolates three well-grounded, still-unfixed patterns beyond what qw3 already
+  addressed, plus two cases where qw3''s own new rules demonstrably fail to fire despite being present
+  in the system text. (1) ''effectiveness'' is now the third-largest aggregate FN mass (7) and is directly
+  responsible for three of this round''s worst-scoring reviews (f1=0.0 each): the blue-light glasses review
+  (gold ''effectiveness: positive'', pred ''blue light filtering''/''color accuracy''), the pitbull snout-guard
+  review (gold ''effectiveness: positive'', pred ''fit: positive'' -- triggered by the literal word ''fit''
+  in the text even though the judgment is about whether the guard slows the dog down), and the spaghetti/angel-hair
+  review (gold ''effectiveness: negative'', pred ''product type: negative''). In qw3, ''effectiveness''
+  was buried as one item in a flat list of ''other generic names to prefer'' with no guidance on when
+  it beats a more literal, surface-matched facet name -- exactly the failure mode all three reviews show.
+  It is promoted to its own disambiguation bullet with an explicit rule to prefer it over literal wording
+  when the review is really judging the product''s core promised outcome. (2) qw3''s own comparison-product
+  exclusion rule (added last round) is present in the system text but completely failed on this round''s
+  #1 worst-scoring review (camera review, f1=0.0, fp=5/fn=2, entirely composed of specs pulled from a
+  named alternative product): a rule with no supporting demonstration is not reliably followed, so a synthetic
+  few-shot example is added to make the boundary concrete. (3) qw3''s own ''functionality'' fix over-corrected:
+  the worst-review evidence this round shows failures in BOTH directions -- the paper-cup dispensing review
+  (gold ''dispensing'', pred ''functionality'') that qw3''s own rationale already cited is still failing
+  under qw3''s evaluation, while a new mirror case (''Extremely helpful in organizing'' -- gold ''functionality'',
+  pred ''organization'') shows the model now over-prefers a specific mechanism name even for a bare, unelaborated
+  action word with no described behavior. The rule is rewritten around an explicit test -- specific mechanism
+  wording only when the review describes concrete behavior of that mechanism, generic ''functionality''
+  when it only names the action in passing -- and reinforced with a synthetic example. That same synthetic
+  example doubles as a demonstration of the listing-accuracy exclusion (also already in qw3''s system
+  text, also already violated this round: the peel-and-stick review produced a stray ''product description
+  accuracy'' FP despite the rule explicitly forbidding it), since qw3''s only listing-accuracy coverage
+  was a bare rule with no supporting example. (4) A modest, low-risk addition: ''finish quality'' is added
+  to the color/design/style/appearance cluster (appearance remains the single largest aggregate FN mass
+  at 13) grounded in the matte-shower-floor worst review (gold ''finish quality'', pred ''appearance'').
+  ''value'' is deliberately left untouched: it remains the single largest FP mass (30) in this round''s
+  aggregate, but qw4''s attempt last round to narrow its definition regressed overall F1 (0.5696 -> 0.5506),
+  and this round''s worst-review list contains no new value-specific failure to ground a different fix
+  -- re-litigating it without fresh evidence risks repeating that regression, so it is left at qw3''s
+  (pre-regression) definition. The sizing-accuracy/size/fit three-way split, assembly-vs-installation,
+  condition-vs-appearance, stability, and reliability disambiguations are left untouched since no worst-review
+  evidence this round shows those failing.'
+change_summary: '1) Rewrote the ''functionality'' bullet to fix both directions of this round''s failures:
+  added an explicit test (does the review describe the mechanism''s concrete behavior, or just name the
+  action in passing) so a bare action word (''helpful in organizing'') stays ''functionality'' while a
+  described behavior (''releases several at a time'', ''had to drill my own holes'') still prefers the
+  specific mechanism name (''dispensing'', ''installation''). Targets functionality''s continuing FP=15/FN=5
+  aggregate mass and two worst-review failures in opposite directions. 2) Added a dedicated ''effectiveness''
+  disambiguation bullet, instructing the model to prefer it over a more literal surface-matched facet
+  name when the review is really judging the product''s core promised outcome. Targets effectiveness''s
+  FN=7 (3rd-largest aggregate FN), evidenced by three worst-scoring reviews (blue-light glasses, pitbull
+  snout-guard, spaghetti/angel-hair). 3) Added ''finish quality'' to the color/design/style/appearance
+  disambiguation for surface coating/texture (matte, glossy, satin) as distinct from general ''appearance''.
+  Targets appearance''s largest-in-report FN=13, evidenced by the matte-shower-floor worst review (gold
+  ''finish quality'', pred ''appearance''). 4) Added a new synthetic few-shot example (blender vs. Vitamix)
+  demonstrating the comparison-product exclusion rule concretely -- the rule already existed in qw3''s
+  text but still failed completely (fp=5, fn=2) on this round''s #1 worst-scoring review. 5) Added a new
+  synthetic few-shot example (shelf bracket) demonstrating both the listing-accuracy exclusion (already
+  in the system rule but violated this round by a stray ''product description accuracy'' FP on the peel-and-stick
+  worst review) and the specific-mechanism-over-''functionality'' preference for a concrete installation
+  complaint, in one non-padded 2-facet case. 6) Deliberately left ''value'' unchanged: it is still the
+  largest FP mass (30), but qw4''s narrower definition already regressed overall F1 last round and this
+  round has no new value-specific worst-review evidence to ground a different fix. 7) Left sizing-accuracy/size/fit,
+  assembly-vs-installation, condition-vs-appearance, stability, and reliability untouched -- not shown
+  failing by this round''s evidence.'
+version: qw5
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'battery life', 'appearance'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'the case doesn't flex when squeezed' -> facet 'build quality', polarity 'positive'.
+  - Product-intrinsic only: ignore delivery, shipping (including shipping speed and how fast it arrived), the condition of the packaging or box itself (as opposed to the product), the seller, and customer service / support interactions -- they are not aspects of the product. The raw price paid is not a facet, but 'value' -- whether the product's quality or features justify its price, a worth-it-or-not judgment -- is a legitimate, distinct facet. Ignore whether the listing, description, or photos accurately represented the product (a listing-accuracy complaint is not a product aspect) -- if a specific quality is being praised or criticized, name that quality instead. Ignore a single defective or damaged-on-arrival unit that was promptly replaced or resolved and is not described as an ongoing or general flaw -- that is a one-off fulfillment incident, not a product-quality aspect, even when paired with customer-service praise. If the review compares the product being reviewed to a different, alternative product, only extract facets about the product actually being reviewed -- ignore specs or opinions attributed to the alternative.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names. Never prefix a facet with the product, its category, or a component name either -- write the bare dimension: 'durability' not 'charger durability', 'video transfer' not 'dvd transfer quality', 'compatibility' not 'charger compatibility'.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Facet naming: use the simplest, most generic dimension name that fits -- near-synonyms are scored as mismatches against the gold vocabulary. Choose carefully among these frequently-confused neighbors:
+    - 'sizing accuracy' (not 'size') is for whether the item's labeled/ordered size runs true -- 'runs small', 'order a size up', 'true to size'.
+    - 'size' is for the product's own literal dimensions or magnitude when no true-to-size judgment is being made -- 'cup size', 'fits my small apartment'.
+    - 'fit' is for how snugly or comfortably the product fits a body or space once in use, not a true-to-size claim.
+    - 'assembly' is for putting a multi-part product together from pieces; 'installation' is for mounting, attaching, or setting up a product to be used.
+    - 'build quality' is for the solidity/craftsmanship of construction -- 'feels solid', 'doesn't flex', 'fell apart'. 'durability' is for withstanding wear, damage, or breakdown over repeated use or time -- 'still works after months', 'scratches easily', 'broke after a week'.
+    - 'stability' is for whether the product stands, balances, or stays in place without tipping, wobbling, or sliding -- distinct from 'build quality' (solidity of construction) and 'durability' (wear resistance over time).
+    - 'color' is for hue/tint/shade specifically; 'design' is for styling or shape choices; 'style' is for overall fashion/aesthetic-language preference; 'finish quality' is for a surface coating or texture treatment (matte, glossy, satin) as its own dimension when the review names a specific finish; 'appearance' is only for a general look/aesthetic impression not already covered by color, design, style, finish quality, or scratch resistance.
+    - 'condition' is for the item's physical state from wear, damage, dirt, or how it arrived or aged -- 'a scuff on arrival', 'filthy', 'cover looks dragged down a road' -- distinct from 'appearance' (an intentional aesthetic/design impression) and from 'build quality'/'durability' (structural solidity and wear resistance).
+    - 'scratch resistance' is for whether a surface resists scratches or marks.
+    - 'reliability' is for whether the product keeps working without failing or malfunctioning over time -- use it even when the complaint text centers on contacting support about the failure (the failure itself is 'reliability', the support interaction is excluded) -- UNLESS the review describes only a single defective-on-arrival unit that was promptly replaced, which is not a reliability aspect (see the fulfillment-incident exclusion above).
+    - 'functionality' is for a holistic does-it-work-as-intended judgment about the product's core purpose. Prefer a specific action/mechanism facet instead (e.g. 'dispensing', 'organization', 'adjustability', 'educational value', 'ease of cleanup', 'installation') ONLY when the review describes a specific behavior of that mechanism -- what it does, or how it succeeds or fails -- beyond merely naming the action in passing. A short, generic statement that just names the action without elaborating on its behavior (e.g. 'extremely helpful in organizing', 'works great') stays 'functionality'. Don't default to 'functionality' as a catch-all for a review describing a particular task's concrete behavior -- and don't default to a narrow mechanism name when the review gives no behavioral detail beyond the bare action word.
+    - 'effectiveness' is for whether the product achieves the specific outcome, result, or claim it's meant to produce -- degree of success at its intended purpose or promise, e.g. a repellent that stops working as well once the dog grows, a blue-light filter that preserves sleep, a product that promises one outcome but delivers another. Use 'effectiveness' even when the review's surface wording suggests a narrower, more literal facet (like 'fit', 'accuracy', 'product type', or a specific filtering/mechanism name) if what's actually being judged is whether the product delivers its core promised result, not a structural or descriptive property.
+    - Other generic names to prefer over narrower compounds: capacity, included accessories, plot, characters, dialogue, pacing, engagement, entertainment.
+  - Deduplicate facets. At most 6, the most salient -- but most reviews genuinely have only 2-4 clear aspects. Never pad the list with generic or weakly-supported facets (e.g. 'user experience', 'versatility', 'additional features') just to approach the cap. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Arrived in two days, super fast! The case itself feels solid and doesn't flex when I squeeze it, but the matte grey finish shows fingerprints constantly and looks smudged five minutes after wiping it down. It came with a spare set of screws and a little cleaning cloth, which was a nice surprise. A bit pricey for what it is, but I don't regret the purchase.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and doesn't flex when I squeeze it
+    - facet: appearance
+      polarity: negative
+      evidence: shows fingerprints constantly and looks smudged
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a spare set of screws and a little cleaning cloth
+    - facet: value
+      polarity: positive
+      evidence: A bit pricey for what it is, but I don't regret the purchase
+- user: |-
+    Putting together the bookshelf took about 20 minutes with the included Allen wrench, no problem at all. Once assembled it feels sturdy and doesn't wobble even when fully loaded with books. The stain is a lovely deep walnut, richer than I expected from the photos. One shelf already has a noticeable scuff mark on it after just two weeks of light use. The listing said it comes with matching drawer pulls but it did not -- kind of annoying, though obviously not the shelf's fault.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: took about 20 minutes with the included Allen wrench, no problem at all
+    - facet: build quality
+      polarity: positive
+      evidence: feels sturdy and doesn't wobble even when fully loaded
+    - facet: color
+      polarity: positive
+      evidence: a lovely deep walnut, richer than I expected
+    - facet: scratch resistance
+      polarity: negative
+      evidence: already has a noticeable scuff mark on it after just two weeks of light use
+- user: |-
+    This soap dispenser pumps out just the right amount every time, no clogging or sputtering. One corner of the base had a small scuff when it arrived, but it doesn't bother me. It tips over pretty easily if you bump the counter, so I keep it pushed against the wall. I did get a first unit with a cracked pump top, but Amazon replaced it within two days and this one has been perfect since.
+  assistant:
+    aspects:
+    - facet: dispensing
+      polarity: positive
+      evidence: pumps out just the right amount every time, no clogging or sputtering
+    - facet: condition
+      polarity: negative
+      evidence: small scuff when it arrived
+    - facet: stability
+      polarity: negative
+      evidence: tips over pretty easily if you bump the counter
+- user: |-
+    This blender crushes ice into smooth powder in seconds and the pitcher hasn't cracked after six months of daily smoothies. For comparison, the Vitamix 5200 has a bigger 64oz pitcher and a stronger 2-horsepower motor, so if you need huge batches that one might serve you better -- but for a single person this one is plenty and costs half as much.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: crushes ice into smooth powder in seconds
+    - facet: durability
+      polarity: positive
+      evidence: the pitcher hasn't cracked after six months of daily smoothies
+- user: |-
+    The listing said this shelf bracket comes pre-drilled and ready to mount, but it did not -- kind of misleading. Drilling my own holes took an extra ten minutes, but once that was done, mounting it onto the wall studs was simple, and it's held a full row of books with no sagging for two months.
+  assistant:
+    aspects:
+    - facet: installation
+      polarity: negative
+      evidence: Drilling my own holes took an extra ten minutes
+    - facet: build quality
+      polarity: positive
+      evidence: held a full row of books with no sagging for two months

@@ -1,0 +1,198 @@
+parent: qw3
+created: '2026-07-22'
+status: candidate
+model: qwen3:14b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two prior children of qw3 (qw4, qw5) each isolated one of the two largest error masses -- qw4
+  narrowed ''value'' via price/cost keyword language (F1 0.5696 -> 0.5506) and qw5 rewrote ''functionality''
+  with a concrete-behavior-vs-named-in-passing test (F1 0.5696 -> 0.5525) -- and both rounds regressed.
+  Per instructions I do not re-propose either literal edit. I leave ''functionality'' completely untouched
+  this round (already tried and failed once) and take a structurally different, more conservative lever
+  on ''value'': instead of triggering on the presence of a price/cost word (qw4''s approach), I require
+  BOTH sides of a cost-vs-quality tradeoff to be present in the same judgment, explicitly exclude bare
+  satisfaction/recommendation language even when a price word is absent from that exclusion list, and
+  reinforce it with a new contrastive few-shot example rather than more system prose alone -- a different
+  teaching modality than qw4 used. This is flagged as the highest-uncertainty edit this round given the
+  two prior failures in this vicinity, but ''value'' FP=30 is more than double the next-largest error
+  (functionality FP=15) and not addressing it at all would ignore the single largest mass in the report.
+  The rest of this round''s budget goes to a fresh, well-evidenced cluster untouched by qw4/qw5: ''appearance''
+  is still the #1 missed gold facet (FN=13) and three of this round''s 20 worst reviews show three distinct,
+  previously-unaddressed boundary failures around it -- (a) B073D6V79G (''Perfect watch for nice occasion'',
+  gold ''style'', pred ''appearance''): the model has no cue that occasion/formality suitability signals
+  ''style'' without an explicit aesthetic adjective, so a style bullet is added; (b) B019QRWRBC (''Love
+  the Matte finish for my new Shower floor'', gold ''finish quality'', pred ''appearance''): gold uses
+  a facet with no vocabulary entry at all, so ''finish quality'' is added as a new, disambiguated facet;
+  (c) B085Z3F5S3 (''Hideous yellow bathroom so at least the towels look good'', gold ''appearance'', pred
+  ''color''): the model over-triggers on a color word describing the surroundings rather than the product
+  itself while the actual judgment is a general look impression, so the color rule is narrowed to require
+  the hue judgment be about the product itself. Separately, ''effectiveness'' is the #3 missed gold facet
+  (FN=7) and two worst reviews show the same pattern -- B0837CR4XK (pitbull-collar review, gold ''effectiveness'',
+  pred ''fit'') and B07ZKF8RSG (angelhair/spaghetti review, gold ''effectiveness'', annotator rationale
+  ''the product doesn''t really deliver what it''s supposed to... promises Class A, outputs Class B'',
+  pred ''product type'') -- both show the model substituting an incidental detail (fit, spec/type mismatch)
+  for the generic outcome judgment gold wants; a dedicated disambiguation bullet is added, mirroring how
+  ''functionality'' already has one, and ''effectiveness'' is removed from the flat generic-name list
+  to avoid duplication. The sizing-accuracy/size/fit, assembly/installation, build-quality/durability,
+  stability, condition, scratch-resistance, reliability, comparison-exclusion, and cap/dedup rules are
+  left untouched: no worst-review evidence this round shows those failing, and prior rounds'' fixes there
+  are holding.'
+change_summary: '1) Narrowed ''value'' to require both sides of a cost-vs-quality tradeoff in the same
+  judgment (e.g. ''pricey but worth it''), explicitly excluding bare satisfaction/recommendation/regret
+  language even without a price word present, and added the note that most reviews should get no ''value''
+  facet -- a structurally different test (AND of both tradeoff sides) than qw4''s price-word-presence
+  approach, which already failed; targets value''s FP=30, the single largest error mass in the report.
+  2) Left ''functionality'' completely unmodified -- qw5 already tried a concrete-behavior rewrite of
+  it and regressed; not re-touching a facet with one failed dedicated attempt already on record. 3) Added
+  a ''style'' clause: occasion/formality/outfit-suitability language (''nice for a night out'') signals
+  ''style'' even without an explicit aesthetic adjective, instead of defaulting to ''appearance''. Targets
+  the B073D6V79G worst review (gold ''style'', pred ''appearance'', f1=0.0) and appearance''s FN=13. 4)
+  Added ''finish quality'' as a new facet for surface treatment/coating (matte, glossy, polished, textured),
+  distinct from ''appearance'' and ''color''. Targets the B019QRWRBC worst review (gold ''finish quality'',
+  pred ''appearance'', f1=0.0), a facet with no prior vocabulary entry. 5) Narrowed ''color'' to require
+  the hue judgment be about the product itself, not an incidental color word describing the surroundings
+  while the real judgment is a general look impression (use ''appearance'' in that case). Targets the
+  B085Z3F5S3 worst review (gold ''appearance'', pred ''color'', f1=0.0). 6) Added a dedicated ''effectiveness''
+  disambiguation bullet: the product''s real-world outcome/purpose judgment, preferred over a narrower
+  incidental detail (fit, spec name, product type) when that''s the review''s real point; removed ''effectiveness''
+  from the flat generic-name list to avoid duplication now that it has its own bullet (mirrors how ''functionality''
+  got its own bullet in qw3). Targets effectiveness''s FN=7 (#3 in the missed-facet list), evidenced by
+  the B0837CR4XK (pitbull collar, pred ''fit'') and B07ZKF8RSG (angelhair/spaghetti, annotator rationale
+  on promised-vs-delivered mismatch, pred ''product type'') worst reviews. 7) Added one new synthetic
+  few-shot example (blender review) demonstrating general recommendation/satisfaction language (''I''d
+  recommend it... glad I bought it'') with NO ''value'' facet extracted, contrasting with example 5''s
+  price-tradeoff case -- demonstrates edit #1 by negative example. 8) Added one new synthetic few-shot
+  example (sunglasses review) demonstrating ''finish quality'', ''style'', and ''effectiveness'' together
+  in one non-padded 3-facet case -- demonstrates edits #3, #4, and #6.'
+version: qw6
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'battery life', 'appearance'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'the case doesn't flex when squeezed' -> facet 'build quality', polarity 'positive'.
+  - Product-intrinsic only: ignore delivery, shipping (including shipping speed and how fast it arrived), the condition of the packaging or box itself (as opposed to the product), the seller, and customer service / support interactions -- they are not aspects of the product. The raw price paid is not a facet. 'value' is a legitimate, distinct facet, but only when the review explicitly weighs cost against quality, features, or performance -- both sides of the tradeoff must be present in the same judgment (e.g. 'pricey but worth it', 'cheaply made for what you pay', 'expensive but performs great'). General satisfaction, recommendation, or purchase-regret language on its own ('happy with this purchase', 'would buy again', 'glad I got it', 'don't regret it') is NOT 'value' unless it is tied to an explicit cost/price/money word in the same judgment -- most reviews should get no 'value' facet at all. Ignore whether the listing, description, or photos accurately represented the product (a listing-accuracy complaint is not a product aspect) -- if a specific quality is being praised or criticized, name that quality instead. Ignore a single defective or damaged-on-arrival unit that was promptly replaced or resolved and is not described as an ongoing or general flaw -- that is a one-off fulfillment incident, not a product-quality aspect, even when paired with customer-service praise. If the review compares the product being reviewed to a different, alternative product, only extract facets about the product actually being reviewed -- ignore specs or opinions attributed to the alternative.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names. Never prefix a facet with the product, its category, or a component name either -- write the bare dimension: 'durability' not 'charger durability', 'video transfer' not 'dvd transfer quality', 'compatibility' not 'charger compatibility'.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Facet naming: use the simplest, most generic dimension name that fits -- near-synonyms are scored as mismatches against the gold vocabulary. Choose carefully among these frequently-confused neighbors:
+    - 'sizing accuracy' (not 'size') is for whether the item's labeled/ordered size runs true -- 'runs small', 'order a size up', 'true to size'.
+    - 'size' is for the product's own literal dimensions or magnitude when no true-to-size judgment is being made -- 'cup size', 'fits my small apartment'.
+    - 'fit' is for how snugly or comfortably the product fits a body or space once in use, not a true-to-size claim.
+    - 'assembly' is for putting a multi-part product together from pieces; 'installation' is for mounting, attaching, or setting up a product to be used.
+    - 'build quality' is for the solidity/craftsmanship of construction -- 'feels solid', 'doesn't flex', 'fell apart'. 'durability' is for withstanding wear, damage, or breakdown over repeated use or time -- 'still works after months', 'scratches easily', 'broke after a week'.
+    - 'stability' is for whether the product stands, balances, or stays in place without tipping, wobbling, or sliding -- distinct from 'build quality' (solidity of construction) and 'durability' (wear resistance over time).
+    - 'color' is for the hue/tint/shade of the product itself -- if a color word describes something other than the product (the surroundings, a room, a comparison item) and the actual judgment is a general look impression of the product, use 'appearance' instead, not 'color'. 'design' is for styling or shape choices. 'style' is for overall fashion/aesthetic-language preference, including whether the item suits an occasion, outfit, or formality level ('nice for a night out', 'goes with everything') even when no explicit style adjective is used -- don't default to 'appearance' just because the review lacks an aesthetic adjective. 'finish quality' is for a surface treatment or coating evaluated as its own quality attribute -- matte, glossy, polished, textured -- distinct from 'appearance' (general look) and 'color' (hue). 'appearance' is only for a general look/aesthetic impression not already covered by color, design, style, finish quality, or scratch resistance.
+    - 'condition' is for the item's physical state from wear, damage, dirt, or how it arrived or aged -- 'a scuff on arrival', 'filthy', 'cover looks dragged down a road' -- distinct from 'appearance' (an intentional aesthetic/design impression) and from 'build quality'/'durability' (structural solidity and wear resistance).
+    - 'scratch resistance' is for whether a surface resists scratches or marks.
+    - 'reliability' is for whether the product keeps working without failing or malfunctioning over time -- use it even when the complaint text centers on contacting support about the failure (the failure itself is 'reliability', the support interaction is excluded) -- UNLESS the review describes only a single defective-on-arrival unit that was promptly replaced, which is not a reliability aspect (see the fulfillment-incident exclusion above).
+    - 'functionality' is for a holistic does-it-work-as-intended judgment about the product's core purpose, ONLY when no more specific mechanism or action is named in the review -- prefer a specific action/mechanism facet instead whenever the review names one, e.g. 'dispensing', 'organization', 'adjustability', 'educational value', 'ease of cleanup'; don't default to 'functionality' as a catch-all for a review describing a particular task or feature.
+    - 'effectiveness' is for whether the product achieves its intended real-world purpose or result once used -- the practical outcome, even when that outcome is described through an incidental detail (a spec mismatch, a sizing or fit detail, a promised-vs-delivered gap) rather than by naming the core mechanism directly; use it over a narrower or unrelated facet (e.g. 'fit', 'product type', a named spec) whenever the review's real point is whether the product worked as intended in practice.
+    - Other generic names to prefer over narrower compounds: capacity, included accessories, plot, characters, dialogue, pacing, engagement, entertainment.
+  - Deduplicate facets. At most 6, the most salient -- but most reviews genuinely have only 2-4 clear aspects. Never pad the list with generic or weakly-supported facets (e.g. 'user experience', 'versatility', 'additional features') just to approach the cap. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Arrived in two days, super fast! The case itself feels solid and doesn't flex when I squeeze it, but the matte grey finish shows fingerprints constantly and looks smudged five minutes after wiping it down. It came with a spare set of screws and a little cleaning cloth, which was a nice surprise. A bit pricey for what it is, but I don't regret the purchase.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and doesn't flex when I squeeze it
+    - facet: appearance
+      polarity: negative
+      evidence: shows fingerprints constantly and looks smudged
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a spare set of screws and a little cleaning cloth
+    - facet: value
+      polarity: positive
+      evidence: A bit pricey for what it is, but I don't regret the purchase
+- user: |-
+    Putting together the bookshelf took about 20 minutes with the included Allen wrench, no problem at all. Once assembled it feels sturdy and doesn't wobble even when fully loaded with books. The stain is a lovely deep walnut, richer than I expected from the photos. One shelf already has a noticeable scuff mark on it after just two weeks of light use. The listing said it comes with matching drawer pulls but it did not -- kind of annoying, though obviously not the shelf's fault.
+  assistant:
+    aspects:
+    - facet: assembly
+      polarity: positive
+      evidence: took about 20 minutes with the included Allen wrench, no problem at all
+    - facet: build quality
+      polarity: positive
+      evidence: feels sturdy and doesn't wobble even when fully loaded
+    - facet: color
+      polarity: positive
+      evidence: a lovely deep walnut, richer than I expected
+    - facet: scratch resistance
+      polarity: negative
+      evidence: already has a noticeable scuff mark on it after just two weeks of light use
+- user: |-
+    This soap dispenser pumps out just the right amount every time, no clogging or sputtering. One corner of the base had a small scuff when it arrived, but it doesn't bother me. It tips over pretty easily if you bump the counter, so I keep it pushed against the wall. I did get a first unit with a cracked pump top, but Amazon replaced it within two days and this one has been perfect since.
+  assistant:
+    aspects:
+    - facet: dispensing
+      polarity: positive
+      evidence: pumps out just the right amount every time, no clogging or sputtering
+    - facet: condition
+      polarity: negative
+      evidence: small scuff when it arrived
+    - facet: stability
+      polarity: negative
+      evidence: tips over pretty easily if you bump the counter
+- user: |-
+    This blender crushes ice into a fine powder in seconds and the pitcher and blade assembly pop out for the dishwasher, so cleanup takes no time at all. I'd recommend it to anyone and I'm really glad I bought it.
+  assistant:
+    aspects:
+    - facet: blending performance
+      polarity: positive
+      evidence: crushes ice into a fine powder in seconds
+    - facet: ease of cleaning
+      polarity: positive
+      evidence: pop out for the dishwasher, so cleanup takes no time at all
+- user: |-
+    The frames have a nice glossy finish and look great with a suit for a wedding, but the lenses don't actually cut much glare while driving like the listing promised.
+  assistant:
+    aspects:
+    - facet: finish quality
+      polarity: positive
+      evidence: nice glossy finish
+    - facet: style
+      polarity: positive
+      evidence: look great with a suit for a wedding
+    - facet: effectiveness
+      polarity: negative
+      evidence: don't actually cut much glare while driving like the listing promised

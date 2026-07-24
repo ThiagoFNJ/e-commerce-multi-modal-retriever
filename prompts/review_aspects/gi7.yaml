@@ -1,0 +1,138 @@
+parent: gi6
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The evidence points to one dominant, cleanly-confirmed naming mismatch this round: gold ''build
+  quality'' is the single largest false-negative mass (FN=13) and ''material quality'' is the second-largest
+  false-positive mass (FP=11) -- a combined 24 mismatched instances, larger than any other single-facet
+  gap in the report (including the sizing accuracy/size gap gi6 already addressed, which is now down to
+  FP ''sizing accuracy''=10). This is not a hypothesized confusion: four of the twenty worst-scoring reviews
+  show the exact same pattern -- the model predicts ''material quality'' (or ''workmanship'') where gold
+  says ''build quality'' -- B07GXM22ZD#9 (gold ''softness: positive; build quality: positive'' for ''el
+  material esta super bien... la calidad es superior''; pred ''material quality: positive; texture: positive;
+  suitability: positive''), B00NYAD2J4#4 (gold ''build quality: positive; softness: positive'' for ''they
+  were high quality, soft, and cute''; pred ''material quality: positive; shape consistency: negative''),
+  B00IT3FSLG#0 (gold ''build quality: positive'' for ''great quality!''; pred ''fit: negative, material
+  quality: positive''), and B07MC6L24P#3 (gold ''build quality: negative'' for ''the workmanship and quality...
+  wasn''t that wonderful''; pred ''workmanship: negative, material quality: negative''). Tracing the source:
+  the prompt itself is self-contradictory on this exact point -- few-shot #4 (the Spanish ''comodo'' review)
+  currently teaches the model to output ''material quality'' for ''el material se siente de buena calidad''
+  (''the material feels like good quality''), which is near-identical phrasing to B07GXM22ZD#9''s gold-labeled-''build
+  quality'' sentence. The model is faithfully reproducing what the prompt taught it; the fix is to correct
+  the demonstration, not add a new rule (rule-bullet facet-distinction edits failed twice already, gi1
+  and gi4, per the lineage notes; renaming within an existing worked example is the lever that worked
+  for gi5/gi6''s sizing-accuracy fix). Edit 1 renames few-shot #4''s facet from ''material quality'' to
+  ''build quality'', removing the contradiction at its source. Two of the four confirming worst-reviews
+  (B07GXM22ZD#9, B00NYAD2J4#4) also co-occur with gold ''softness'' -- a facet never demonstrated anywhere
+  in the current prompt -- which plausibly pushes the model toward invented substitutes (''texture'',
+  ''shape consistency'') when it lacks a term for ''(soft, plush, cuddly)'' material feel. Edit 2 adds
+  one synthetic 7th few-shot example (a stuffed-toy review, no dev text copied) pairing ''softness'' with
+  a second, independent positive demonstration of the corrected ''build quality'' term, reinforcing edit
+  1 in a different context. Both edits are renaming/additive only, add no new rule bullets, and keep the
+  prompt well under double its current length.'
+change_summary: '1) Renamed the facet in few-shot #4 (Spanish ''comodo'' review) from ''material quality''
+  to ''build quality'' for the line ''el material se siente de buena calidad'' -- this example was the
+  direct source of the model''s largest naming confusion: it taught ''material quality'' for phrasing
+  nearly identical to gold''s ''build quality'' label in worst-review B07GXM22ZD#9 (''el material esta
+  super bien... la calidad es superior''), and the same material-quality-for-build-quality substitution
+  recurs in three more worst reviews (B00NYAD2J4#4, B00IT3FSLG#0, B07MC6L24P#3). This targets the single
+  largest combined error mass in the report: FN ''build quality''=13 + FP ''material quality''=11 = 24
+  mismatched instances. 2) Added a new synthetic 7th few-shot example (stuffed-elephant review; not copied
+  from any dev review) demonstrating ''softness'' as a distinct valid facet -- never demonstrated anywhere
+  in the prompt, yet gold-labeled alongside ''build quality'' in two of the four confirming worst reviews
+  (B07GXM22ZD#9, B00NYAD2J4#4) where the model instead invented ''texture''/''shape consistency'' -- paired
+  with a second positive ''build quality'' demonstration to reinforce edit 1 in an independent context,
+  taught via example rather than a new rule bullet, consistent with the pattern that worked in gi5/gi6
+  and avoiding the rule-bullet pattern that failed twice (gi1, gi4).'
+version: gi7
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: build quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for
+- user: |-
+    This blender arrived with a recipe booklet and an extra blending cup I wasn't expecting, which was a nice bonus. It's noticeably smaller than it looked in the photos, so it barely fits under my cabinets. That said, it works exactly as advertised, crushing ice smoothly every time, and six months of daily smoothies in, it hasn't slowed down at all.
+  assistant:
+    aspects:
+    - facet: included accessories
+      polarity: positive
+      evidence: arrived with a recipe booklet and an extra blending cup I wasn't expecting
+    - facet: size
+      polarity: negative
+      evidence: noticeably smaller than it looked in the photos, so it barely fits under my cabinets
+    - facet: functionality
+      polarity: positive
+      evidence: works exactly as advertised, crushing ice smoothly every time
+    - facet: reliability
+      polarity: positive
+      evidence: six months of daily smoothies in, it hasn't slowed down at all
+- user: |-
+    This stuffed elephant is unbelievably soft and plush, my daughter carries it everywhere and naps with it every day. After a year of daily hugs and two trips through the washing machine, the seams are still tight and none of the stitching has come loose - it's clearly well made.
+  assistant:
+    aspects:
+    - facet: softness
+      polarity: positive
+      evidence: unbelievably soft and plush
+    - facet: build quality
+      polarity: positive
+      evidence: the seams are still tight and none of the stitching has come loose - it's clearly well
+        made

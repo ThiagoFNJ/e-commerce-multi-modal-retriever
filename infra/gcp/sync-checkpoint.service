@@ -1,0 +1,6 @@
+[Unit]
+Description=Sync extraction checkpoint to GCS
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '[ -f /opt/emmr/ckpt/review_aspects.jsonl ] && gsutil -q cp /opt/emmr/ckpt/review_aspects.jsonl gs://emmr-9122a143/ckpt/review_aspects.jsonl || true'

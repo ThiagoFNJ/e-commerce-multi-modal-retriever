@@ -1,0 +1,284 @@
+parent: gm3
+created: '2026-07-22'
+status: candidate
+model: gemma4:12b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'The two largest, most concretely-evidenced error masses are (A) the material/build-quality cluster
+  (build quality FP=13, the single largest FP, plus FN=5; material FP=11, the second-largest FP) and (B)
+  the functionality/effectiveness cluster (functionality FN=6, effectiveness FN=7, the second-largest
+  FN mass overall) which is entangled with ''performance'' still appearing as a top-15 FP (4) despite
+  being explicitly banned, and with ''organization'' appearing as a smaller but recurring FP (3). Both
+  clusters show the same underlying pattern from gm2 and gm3''s rationales continuing: the model grabs
+  whatever concrete-sounding word is nearest in the sentence instead of checking what the sentence is
+  actually judging. For (A), three worst-scoring reviews make the failure mode concrete and non-hypothetical:
+  the Jellycat-bunny review (''high quality, soft, and cute'') is predicted material+appearance where
+  gold wants build quality+softness -- the bare-quality-defaults-to-build-quality rule gm3 already added
+  is being overridden the moment a ''soft'' or ''material'' word appears nearby; the baby-blanket review
+  (''el material esta super bien, es muy suave... la calidad es superior'') collapses two distinct gold
+  facets (softness, build quality) into a single ''material'' prediction, same failure; and the LED-strobe
+  review (''very rigid plastic... very robust and compact''), which gm2->gm3''s camping-stool example
+  was built to fix, still gets material+build quality instead of gold''s sturdiness+portability -- showing
+  the fix didn''t transfer because the material definition''s own examples (''feels like cheap plastic'',
+  ''soft fabric'') actively invited exactly this confusion. The root cause is that ''material'' was defined
+  broadly enough to swallow softness and structural-toughness language whenever a substance word was present,
+  and the water-bottle-cap review (''if it lasts I''ll be happy'' -> predicted material:positive, gold
+  durability:neutral, no substance description at all in the review) shows the same term firing on a bare
+  material NAME with no feel judgment attached. I rewrote the material definition to name all three carve-outs
+  explicitly (softness, sturdiness/structural-toughness, bare-name-with-no-judgment) and added a rule
+  that a bare quality remark plus a separate texture/substance remark must be extracted as two facets,
+  not collapsed into one ''material'' prediction. For (B), three worst-scoring reviews show the same ''grab
+  the nearest concrete word'' failure operating in the opposite direction from gm2/gm3''s original problem:
+  ''Extremely helpful in organizing'' is predicted ''organization'' where gold wants ''functionality''
+  (the product''s generic helping-me-do-a-task claim, not a described physical layout); ''My 6 year drops
+  bombs off this tee'' is predicted ''performance'' -- the explicitly banned term still leaking through
+  -- where gold wants ''functionality''; and the pitbull-muzzle review (''now that he is bigger... it
+  slows him down'') is predicted ''fit:negative'' where gold wants ''effectiveness:positive'', because
+  ''fit'' is the incidental noun nearest the sentence even though the review is really judging whether
+  the muzzle achieves its restraining purpose. I added an explicit carve-out to the specific-over-generic
+  rule stating that it only fires when a genuine distinct mechanism/feature is named, not when an incidental
+  task-word rides along a generic ''it works''/''it helps me do X'' claim, with ''organization'' restricted
+  to an actual described physical layout (compartments, pockets, hooks) rather than a generic organizing
+  outcome. I also promoted the ''never performance'' rule to its own standalone sentence given it is a
+  compliance failure on an existing rule, not a missing rule, and it needs salience, not a new mechanism.
+  Because ''effectiveness'' had no formal definition in the distinctions bullet at all (only functionality,
+  reliability, durability, build quality, and material were defined), I added one, and split it from functionality
+  using a concrete heuristic (does the product change something outside itself as promised -- a body,
+  surface, or environment -- versus does the product''s own operation simply work) that is directly grounded
+  in the pitbull-muzzle and angel-hair-pasta reviews (''angel hair, not spaghetti'' -- predicted ''size'',
+  gold ''effectiveness:negative'', because the product failed to deliver its promised type, an outcome
+  judgment, not a dimension judgment). Separately, ''appearance'' is the single largest missed-gold-facet
+  mass in the whole table (FN=9) while it was folded into the same six-term avoidance set as the others,
+  and the bling/watch-tool review (''Just enough bling so you can wear day or night'' -- predicted ''versatility'',
+  gold includes ''appearance'') shows the model over-avoiding the bare visual-impression term exactly
+  when gold wants it; I pulled ''appearance'' out of the avoidance set and restated it as the default
+  general-visual-impression term, and added ''sparkle/bling'' to its definition since that is the concrete
+  missed case. Smaller FN/FP pairs this round are pure vocabulary gaps below the 0.80 similarity bar rather
+  than reasoning errors (durability predicted vs. gold ''longevity'', ''ease of cleaning'' predicted vs.
+  gold ''erasability'' in the Spanish-markers review; ''leakage'' vs. gold ''leak protection''; the hair-chalk-box
+  review wanting a unified ''case quality'' where the model split build quality+organization) -- I added
+  these as catalog vocabulary entries only, without inventing dedicated rules per term, consistent with
+  how smaller masses were handled in prior rounds. I deliberately left the reliability/durability boundary
+  gm3 already sharpened untouched, since this round''s evidence for durability''s remaining FP/FN mass
+  traces to the material-overuse and generic-filler problems already fixed above, not to a reliability/durability
+  confusion, and I left the ''design'' vs ''color'' vs ''appearance'' three-way boundary otherwise untouched
+  beyond the bling fix, since I don''t have a second concrete worst-review anchor for it this round and
+  don''t want to invent an unevidenced mechanism there. For the two few-shot changes (within the 2-example
+  budget): a day-planner example puts a genuine physical-layout ''organization'' facet (a zippered pocket)
+  directly beside a generic organizing-outcome claim that must resolve to ''functionality'', which is
+  the exact contrast the organizing-tool review shows the model missing; a baby-blanket example demonstrates
+  ''softness'' and ''build quality'' as two separate facets from one bare-quality-plus-texture sentence,
+  with a bare material-name mention (''100% cotton'', no judgment attached) correctly producing no material
+  facet at all, directly targeting the Jellycat-bunny and baby-blanket-review failures. Both are dense,
+  multi-aspect, and written fresh, without copying any development-set review.'
+change_summary: 'Rewrote the ''material'' definition to explicitly exclude three things it was swallowing:
+  tactile softness/plushness (-> ''softness''), structural toughness/rigidity used to support a strength
+  or compactness claim (-> ''sturdiness''/''durability''), and a bare material name with no accompanying
+  feel judgment (-> not a facet at all); added a rule that a bare ''quality'' remark plus a separate texture/substance
+  remark must be extracted as two facets, not collapsed into one -- targets this round''s largest FP (build
+  quality 13) and second-largest FP (material 11), evidenced concretely by the Jellycat-bunny, baby-blanket,
+  LED-strobe, and water-bottle-cap worst-scoring reviews, three of which are the same failure mode surviving
+  two prior rounds of fixes aimed at it.
+
+
+  Added an explicit carve-out to the ''prefer specific over generic'' rule: it only applies when the review
+  names a genuine distinct mechanism/feature, not when an incidental task-word rides along a generic ''it
+  works''/''it helps me do X'' claim -- targets the organizing-tool review (''helpful in organizing''
+  predicted ''organization'', gold ''functionality'') and the pitbull-muzzle review (''slows him down''
+  predicted ''fit'', gold ''effectiveness'').
+
+
+  Restricted ''organization'' (moved into the preferred-terms bullet) to reviews describing an actual
+  physical layout feature (compartments, pockets, hooks), never a generic ''helps me stay organized''
+  outcome claim -- targets the same organizing-tool review and the ''organization'' FP mass (3).
+
+
+  Promoted ''never use performance'' to its own standalone sentence -- it is still a top-15 FP (4) despite
+  already being banned, a compliance/salience issue rather than a missing rule, evidenced by the nerf-gun
+  review (''drops bombs off this tee'' predicted ''performance'', gold ''functionality'').
+
+
+  Added a formal ''effectiveness'' definition (previously the only one of the six broad terms with no
+  distinction bullet) split from ''functionality'' by a concrete heuristic -- does the product change
+  something outside itself (body/surface/environment) as promised, versus does the product''s own operation
+  simply work -- targets effectiveness''s FN=7 (second-largest missed-facet mass), evidenced by the pitbull-muzzle
+  and angel-hair-pasta worst-scoring reviews.
+
+
+  Pulled ''appearance'' out of the six-term avoidance set and restated it as the default general-visual-impression
+  term, adding ''sparkle/bling'' to its definition -- targets appearance''s FN=9, the single largest missed-gold-facet
+  mass in the whole table, evidenced by the watch-tool review (''Just enough bling'' predicted ''versatility'',
+  gold includes ''appearance'').
+
+
+  Expanded the closing catalog vocabulary with terms surfaced by this round''s near-miss semantic mismatches
+  (wet strength, longevity, erasability, leak protection, case quality) -- each is a small missed/false-positive
+  pair caused by the model''s synonym not clearing the 0.80 similarity threshold, added as vocabulary
+  only, no new dedicated rules.
+
+
+  Added one new synthetic few-shot example (day planner) demonstrating a genuine physical-layout ''organization''
+  facet beside a generic organizing-outcome claim that resolves to ''functionality'', without copying
+  any development-set text.
+
+
+  Added one new synthetic few-shot example (baby blanket) demonstrating ''softness'' and ''build quality''
+  as two separate facets from one bare-quality-plus-texture sentence, with a bare material-name mention
+  producing no material facet, without copying any development-set text.'
+version: gm5
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION or discrete COMPONENT of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'camera', 'speaker'. If several components share one complaint (e.g. multiple panels that all fit badly), name the shared dimension once ('fitment', 'build quality') rather than each part; name a specific component only when its opinion is genuinely distinct from the rest.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+  - Prefer the most specific concrete facet the review actually supports over a broad outcome or category term. This applies to 'effectiveness', 'functionality', 'reliability', 'durability', 'build quality', and 'material': reach for one of these six only when the review gives no more specific mechanism, feature, or quality to name -- if it names one (suction, stability, sturdiness, portability, strength, softness, mess control, mounting design, ease of attachment, dispensing, storage capacity, power, battery life, software, versatility, brewing quality, and so on), use that specific term instead.
+  - Never use 'performance' as a facet, under any circumstance, even when the review itself uses that word: always name the specific thing that performed well or badly (power, speed, brewing quality, accuracy, functionality, effectiveness, ...).
+  - The specific-over-generic preference above only fires when the review names an actual distinct mechanism, feature, or component as the thing being judged. When a review's real claim is simply that the product accomplishes its intended purpose or produces its intended effect -- "it works", "it does the job", "it helps me do X" -- with no separate feature described, keep the broad label ('functionality' or 'effectiveness') even if the sentence happens to contain an incidental task-related word. Do not let that incidental word masquerade as a specific facet: a toy that fires or moves as intended with no further mechanism described is 'functionality', not a made-up specific term; a product praised only as generally "helpful for organizing" or "keeping things organized," with no physical layout feature described, is 'functionality', not 'organization' (organization is reserved for an actual physical layout -- see below); a restraint that now visibly achieves its intended effect on a person, animal, or surface is 'effectiveness', not an unrelated concrete noun like 'fit' or 'size' that happens to appear in the sentence.
+  - 'appearance' is not part of the six-term avoidance set above: it is already the general, default term for a plain visual impression ('looks nice', 'looks cheap', general finish, print, sparkle, or overall look), so use it directly rather than searching for something more specific -- only reach past it when the review names an attribute with its own preferred term instead ('color' for hue, 'design' for a considered styling/shape choice).
+  - Among the six broad terms above, when more than one could plausibly apply, use these distinctions:
+    - 'effectiveness': whether the product changes or affects something outside itself -- a body, a surface, an animal, an environment -- the way it is meant to: pain relief, a stain lifting, a muzzle or harness actually restraining/slowing the wearer, a promised type or spec actually being delivered. An outcome-in-the-world judgment, distinct from 'functionality' just below.
+    - 'functionality': the product's own features, controls, or mechanisms operate as designed -- plain "it works" / "no problems" statements, an app or button responding correctly, and generic "this helps me get X done" claims about the product's designed role, with no outside effect or further mechanism specifically named.
+    - 'reliability': the product (or one of several like units) stops working, malfunctions, glitches, or behaves inconsistently -- across repeated use or after a period of time -- even if that happens later rather than immediately. A device that fails outright after months of use is a reliability judgment, not a durability one.
+    - 'durability': the product's physical materials or components gradually wear, fade, weaken, or degrade over extended time or repeated use -- a condition/degradation judgment, not a stop-working judgment -- and never immediate/out-of-box defects.
+    - 'build quality': how well the product is assembled or constructed -- workmanship, structural integrity, parts fitting together, or defects, including out-of-box defects -- and also any bare, undetailed statement of overall "quality" ('great quality', 'the quality is amazing', 'la calidad es superior') that does not itself describe a substance, fabric, or texture.
+    - 'material': the substance or fabric itself, judged on its own feel, texture, or composition ('feels like cheap plastic', 'breathable fabric', 'sturdy denim') -- only when the review actually describes that substance's own quality. 'material' excludes three things that are easy to confuse with it: (a) tactile softness or plushness ('soft', 'suave', 'plush', 'fluffy', 'silky') -- that is 'softness'; (b) structural toughness, rigidity, or robustness used to support a strength or compactness claim ('very rigid', 'feels robust', 'solid, doesn't flex') -- that is 'sturdiness' (or 'durability' if it is about wear over time); (c) simply naming what the product is made of ('made of steel', '100% cotton') with no accompanying feel or quality judgment -- that is not a facet at all. When a review makes a bare "quality" remark AND a separate texture/substance remark, extract them as two separate facets (e.g. 'build quality' + 'softness', or 'build quality' + 'material') rather than collapsing both into one 'material' facet.
+  - When a review makes many small observations that all serve one underlying theme (a long testimonial on whether a workout, tool, or treatment worked as intended) AND names no other distinct concrete dimension, extract ONE facet for that theme using the definitions above instead of several fine-grained ones that fragment it. Do not apply this consolidation to a short review that already names 1-3 distinct concrete dimensions -- extract those directly instead.
+  - 'effectiveness', 'durability', 'build quality', and 'material' describe physical products or products applied to the body, and never apply to creative or informational works (books, movies, shows, music, articles). For those, use dimensions such as 'plot', 'characters', 'writing quality', 'pacing', 'humor', 'engagement', 'emotional impact', 'content quality', or 'entertainment value' instead.
+  - Preferred terms for near-synonyms (matching is by semantic similarity, so use the left term, not the one on the right): 'appearance' for a general visual impression, finish, print, sparkle/bling, or overall look that is not framed as a design choice and not specifically about color; 'color' for a comment specifically about the product's hue or color, whether the reviewer simply likes or dislikes it or is comparing it to photos/expectations; 'design' for the product's overall styling, shape, or aesthetic/ergonomic design as a considered choice ('beautiful design', 'sleek design', 'well-designed'); 'softness' for tactile softness or plushness, distinct from 'material' (see above); 'organization' only when the review describes an actual physical layout feature -- compartments, dividers, pockets, hooks, slots -- never for a generic "it helps me stay organized" outcome claim with no layout described, which is 'functionality'; 'size' for a non-wearable object's physical dimensions being too big or small for its purpose; 'sizing accuracy' only for how a wearable item runs relative to its labeled or expected size; 'included accessories' for extra items, tools, or parts bundled with the product.
+  - If none of the terms above fit, name the dimension using the review's own vocabulary (e.g. 'installation', 'fit', 'condition', 'style', 'thickness', 'scratch resistance', 'ease of cleaning', 'sturdiness', 'portability', 'strength', 'wet strength', 'mess control', 'mounting design', 'ease of attachment', 'dispensing', 'ingredient safety', 'educational value', 'scent', 'storage capacity', 'longevity', 'erasability', 'leak protection', 'case quality') rather than forcing it into one of the broad terms above.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    I bought this vibrating foam roller for my chronic calf tightness, and it's honestly done more for me in a month than years of stretching ever did — I can finally touch my toes again. It also looks sleek on my shelf and came with a mesh carrying bag, which was a nice bonus. Six months of near-daily use later it still holds its charge and works like day one, though the power button felt a little wobbly right out of the box.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: done more for me in a month than years of stretching ever did
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on my shelf
+    - facet: included accessories
+      polarity: positive
+      evidence: came with a mesh carrying bag
+    - facet: durability
+      polarity: positive
+      evidence: Six months of near-daily use later it still holds its charge and works like day one
+    - facet: build quality
+      polarity: negative
+      evidence: the power button felt a little wobbly right out of the box
+- user: |-
+    This webcam's autofocus locks on fast and the video looks crisp even in dim light. The clip has a sleek, minimalist design that matches my monitor, and the aluminum body feels solid in the hand. My only complaint is the app crashes about once a week and I have to unplug and replug the camera to get the feed back.
+  assistant:
+    aspects:
+    - facet: autofocus
+      polarity: positive
+      evidence: autofocus locks on fast
+    - facet: image quality
+      polarity: positive
+      evidence: the video looks crisp even in dim light
+    - facet: design
+      polarity: positive
+      evidence: sleek, minimalist design that matches my monitor
+    - facet: build quality
+      polarity: positive
+      evidence: the aluminum body feels solid in the hand
+    - facet: reliability
+      polarity: negative
+      evidence: the app crashes about once a week and I have to unplug and replug the camera to get the
+        feed back
+- user: |-
+    This collapsible camping stool holds firm even when I lean back on uneven, rocky ground, and it folds down small enough to clip onto the outside of my pack for the hike in. After an entire summer of weekly trips the fabric seat still looks brand new, no fraying or fading anywhere. The one hiccup is the folding latch: about half the time it doesn't catch on the first try, so I have to fold and unfold it again to get it to lock.
+  assistant:
+    aspects:
+    - facet: sturdiness
+      polarity: positive
+      evidence: holds firm even when I lean back on uneven, rocky ground
+    - facet: portability
+      polarity: positive
+      evidence: folds down small enough to clip onto the outside of my pack
+    - facet: durability
+      polarity: positive
+      evidence: After an entire summer of weekly trips the fabric seat still looks brand new, no fraying
+        or fading anywhere
+    - facet: reliability
+      polarity: negative
+      evidence: about half the time it doesn't catch on the first try
+- user: |-
+    This remote-control car was a hit with my nephew. The controller buttons respond the instant you press them, with no lag, and it holds a straight line even taking corners at full speed. The plastic shell on the car itself flexed alarmingly the first time it flipped over in a crash, though nothing actually cracked. One of the four AA batteries included in the box was dead on arrival.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: controller buttons respond the instant you press them, with no lag
+    - facet: build quality
+      polarity: negative
+      evidence: plastic shell on the car itself flexed alarmingly the first time it flipped over in a
+        crash
+    - facet: included accessories
+      polarity: negative
+      evidence: One of the four AA batteries included in the box was dead on arrival
+- user: |-
+    This day planner has genuinely made it so much easier to keep my week organized - I finally stopped missing appointments and last-minute deadlines. There's also a zippered pocket inside the back cover that's perfect for stashing loose receipts and business cards so they don't get lost in my bag.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: made it so much easier to keep my week organized - I finally stopped missing appointments
+        and last-minute deadlines
+    - facet: organization
+      polarity: positive
+      evidence: zippered pocket inside the back cover that's perfect for stashing loose receipts and business
+        cards
+- user: |-
+    This baby blanket is unbelievably soft against my daughter's skin, and honestly the quality feels way better than what the price would suggest. The tag says it's 100% cotton, though I couldn't really tell you myself.
+  assistant:
+    aspects:
+    - facet: softness
+      polarity: positive
+      evidence: unbelievably soft against my daughter's skin
+    - facet: build quality
+      polarity: positive
+      evidence: the quality feels way better than what the price would suggest

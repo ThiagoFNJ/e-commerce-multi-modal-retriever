@@ -1,0 +1,170 @@
+parent: gi7
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two clean, well-evidenced gaps stand out this round, and neither requires touching a rule bullet
+  (which has failed twice, gi1/gi4) or an already-working example (sizing-accuracy''s few-shot #3, fixed
+  in gi5/gi6). First: ''functionality'' (FN=9) and ''effectiveness'' (FN=8) are the single largest and
+  second-largest missed-gold-facet masses in the whole report (17 combined), and five of the twenty worst
+  reviews confirm the same failure mode -- the model invents a narrow, task-specific facet instead of
+  the general term the prompt already teaches once each: B01M2YXRM9#8 (''sirve bien'' -> gold functionality;
+  pred ''reliability''), B089K66GRZ#5 (''Extremely helpful in organizing'' -> gold functionality; pred
+  ''organization''), B07ZKF8RSG#9 (''Angelhair, not spaghetti'' -> gold effectiveness; pred ''texture''),
+  B08NHPQMY5#6 (''doesn''t massage my scalp well'' -> gold effectiveness; pred ''scalp massage''), B07SG76JPK#5
+  (''hair seemed no more manageable'' -> gold effectiveness; pred ''manageability''). Each concept is
+  currently demonstrated only once, in only one polarity, in only one domain (functionality=positive in
+  the blender example, effectiveness=negative in the desk-lamp example), which isn''t enough for the model
+  to generalize the functionality/effectiveness distinction (does it mechanically operate vs. does it
+  achieve its promised result) away from inventing bespoke substitutes. Edit 1 adds a synthetic air-purifier
+  example that puts both facets side by side in one review with the same operates-fine/doesn''t-achieve-its-purpose
+  contrast seen across the five confirming reviews, reinforcing the existing demonstrations in a second,
+  independent domain -- the same ''add a second reinforcing demo in a new context'' move that worked for
+  gi7. Second: ''sizing accuracy'' is the single largest false-positive facet (FP=12), and its combined
+  mass with the two gold facets it''s overwriting -- ''size'' (FN=7) and ''fit'' (FN=7) -- is 26, the
+  largest single combined error mass in this report (larger than gi7''s 24 that motivated the build-quality
+  fix). Of the three confirming worst reviews, two involve ''fit'' (B08BZ7FNRM#0 ''It''s great, just a
+  little tight'' -> gold fit:neutral, pred sizing accuracy:negative; B01BI85NTA#7 ''Extremely large at
+  the bottom of leg opening'' -> gold fit:negative, pred sizing accuracy:negative), and ''fit'' -- unlike
+  ''size'', which is already demonstrated in the blender example -- is never demonstrated anywhere in
+  the current prompt, exactly the missing-facet pattern that made gi7''s softness addition work. I deliberately
+  do not touch the size vs. sizing-accuracy split (only one confirming instance, B07VC791X3#3, and the
+  two phrasings are semantically closer, so editing few-shot #3 risks undoing gi5/gi6''s hard-won fix);
+  instead Edit 2 adds a synthetic shirt-sizing example that keeps ''sizing accuracy'' positive (size chart
+  was accurate, no need to size up/down) while a separate ''fit'' aspect is negative (tight waistband)
+  in the very same review -- demonstrating by direct contrast that the two facets are independent dimensions,
+  not synonyms. Both edits are pure additions (no rule bullets, no rewritten existing examples), stay
+  well under double the current prompt length, and use fully synthetic review text.'
+change_summary: '1) Added a new synthetic air-purifier few-shot example demonstrating ''functionality''
+  (operates correctly: turns on, fan runs smoothly) as positive alongside ''effectiveness'' (fails to
+  achieve its purpose: room still smells musty) as negative in the same review -- targets the two largest
+  FN masses in the report (functionality=9, effectiveness=8, combined 17), reinforcing each concept in
+  a second domain/polarity beyond its single existing demonstration (blender=functionality positive only,
+  desk lamp=effectiveness negative only), consistent with the five confirming worst reviews where the
+  model substituted invented narrow facets (''reliability'', ''organization'', ''texture'', ''scalp massage'',
+  ''manageability'') for these general terms. 2) Added a new synthetic shirt-sizing few-shot example introducing
+  ''fit'' as a facet distinct from ''sizing accuracy'' -- pairing a positive ''sizing accuracy'' aspect
+  (size chart was accurate, true to size) with a negative ''fit'' aspect (tight waistband) in the same
+  review to teach by contrast that they are independent dimensions. Targets the largest combined error
+  mass in the report: FP ''sizing accuracy''=12 + FN ''fit''=7 + FN ''size''=7 = 26, confirmed by two
+  worst reviews (B08BZ7FNRM#0, B01BI85NTA#7) where ''fit'' was overwritten by ''sizing accuracy'' -- and,
+  like gi7''s successful ''softness'' addition, fixes a facet that was never demonstrated anywhere in
+  the prompt. Left the size vs. sizing-accuracy boundary and few-shot #3 untouched (only one confirming
+  instance, closer semantic overlap, higher risk of regressing gi5/gi6''s fix). Both changes are additive
+  only -- no new rule bullets (per lineage, that pattern failed twice in gi1/gi4), no existing example
+  rewritten, no dev review text copied, and total few-shot count grows from 7 to 9, well under double
+  the current prompt length.'
+version: gi8
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: build quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for
+- user: |-
+    This blender arrived with a recipe booklet and an extra blending cup I wasn't expecting, which was a nice bonus. It's noticeably smaller than it looked in the photos, so it barely fits under my cabinets. That said, it works exactly as advertised, crushing ice smoothly every time, and six months of daily smoothies in, it hasn't slowed down at all.
+  assistant:
+    aspects:
+    - facet: included accessories
+      polarity: positive
+      evidence: arrived with a recipe booklet and an extra blending cup I wasn't expecting
+    - facet: size
+      polarity: negative
+      evidence: noticeably smaller than it looked in the photos, so it barely fits under my cabinets
+    - facet: functionality
+      polarity: positive
+      evidence: works exactly as advertised, crushing ice smoothly every time
+    - facet: reliability
+      polarity: positive
+      evidence: six months of daily smoothies in, it hasn't slowed down at all
+- user: |-
+    This stuffed elephant is unbelievably soft and plush, my daughter carries it everywhere and naps with it every day. After a year of daily hugs and two trips through the washing machine, the seams are still tight and none of the stitching has come loose - it's clearly well made.
+  assistant:
+    aspects:
+    - facet: softness
+      polarity: positive
+      evidence: unbelievably soft and plush
+    - facet: build quality
+      polarity: positive
+      evidence: the seams are still tight and none of the stitching has come loose - it's clearly well
+        made
+- user: |-
+    The size chart said medium would be true to size for my measurements, and it was - no need to size up or down. But once I put it on, the sleeves were fine while the waistband dug in and felt way too tight for how loose the rest of the shirt is.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: positive
+      evidence: The size chart said medium would be true to size for my measurements, and it was - no
+        need to size up or down
+    - facet: fit
+      polarity: negative
+      evidence: the waistband dug in and felt way too tight for how loose the rest of the shirt is
+- user: |-
+    This air purifier turns on right away and the fan runs smoothly through all three speed settings without any rattling. That said, after two weeks running it daily in my bedroom, the room still smells just as musty as before, so I don't think it's actually filtering much.
+  assistant:
+    aspects:
+    - facet: functionality
+      polarity: positive
+      evidence: turns on right away and the fan runs smoothly through all three speed settings without
+        any rattling
+    - facet: effectiveness
+      polarity: negative
+      evidence: the room still smells just as musty as before, so I don't think it's actually filtering
+        much

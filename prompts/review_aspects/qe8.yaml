@@ -1,0 +1,210 @@
+parent: qe5
+created: '2026-07-22'
+status: candidate
+model: qwen3:8b
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'qe5 (F1 0.5065) is still the best node in this loop. Both children tried since then regressed:
+  qe6 (0.4990) added a different-product-comparison exclusion, a price+quality bundling clause, a new
+  ''color'' facet, and ''installation''/''assembly'' allow-list entries; qe7 (0.4899, the second-worst
+  score in the whole lineage after qe1) added a stronger money/price clause, a build-quality craftsmanship
+  exception for words like ''flawless''/''solid'', a new ''sturdiness'' facet, promoted ''stability''
+  to top-level, and narrowed the ''design'' rule to exclude compactness/construction language. All of
+  those are exactly the levers this round''s fresh evidence would otherwise point back toward (functionality/value
+  still dominate FPs, build quality is still the #1 FN, design is still a top-5 FP, B01BPJLC6U#0''s sturdiness/portability
+  pair is still unmatched) -- but the instructions are explicit not to re-propose edits that already failed,
+  and two consecutive multi-edit rounds regressing off the same qe5 parent is itself strong lineage evidence
+  that stacking several simultaneous rule/facet changes is currently hurting this model rather than helping
+  it (qe5''s own 7-edit round only gained +0.0016 over qe3''s ~2-edit +0.024 gain, and the next two even-larger
+  rounds went negative). So this round deliberately scales back to a single, low-risk, previously-untouched
+  lever instead of another kitchen-sink round. The aggregate FP list shows ''material quality'' at 11
+  occurrences (tied for #5) with zero corresponding entry anywhere in the missed-gold list -- unlike ''build
+  quality'', ''durability'', ''appearance'', or ''design'', which are confused WITH some specific gold
+  facet, ''material quality'' is pure over-generation with no gold target to align to, meaning it is a
+  genuine near-duplicate/padding leak rather than a naming-alignment problem. The existing dedup rule
+  only forbids emitting the identical facet name twice; it says nothing about a single observation being
+  described by two or three near-synonym facet names in the same response (e.g. a construction remark
+  producing both ''build quality'' and ''material quality'', or ''durability''). I extend that same rule
+  -- already part of a rule family that improved the score every time it was touched (qe2, qe5) -- with
+  a near-duplicate-CONCEPT clause, and add one new synthetic few-shot example that makes the merge-not-split
+  behavior concrete while also reinforcing ''reliability'' as the correct mechanism-specific name (rather
+  than defaulting to ''functionality'', still the #1 FP mass at 38) for a ''stayed connected'' claim,
+  without touching the functionality rule text itself this round. Nothing else in qe5''s system text or
+  its 10 existing examples is changed.'
+change_summary: '1. Extended the existing ''Deduplicate facets'' rule with a near-duplicate-CONCEPT clause:
+  when a single observation could be labeled with more than one near-synonym facet (named example pair:
+  ''build quality'' / ''material quality'' / ''durability'' describing one construction remark), extract
+  it once under the single best-fitting name, never as two or three near-synonyms -- targets ''material
+  quality'' as an aggregate FP mass of 11 with zero matching entries anywhere in the missed-gold list
+  (pure over-generation, not a naming-alignment gap), an error mass no prior round in this lineage has
+  addressed.
+
+
+  2. Added new few-shot example 11 (Bluetooth speaker mount): demonstrates the near-duplicate restraint
+  directly (one ''solid, well-made ... thick, sturdy metal rather than cheap plastic'' remark yields a
+  single ''build quality'' facet, resisting the temptation to also emit ''material quality'' or ''durability''
+  for the same sentence) and reinforces ''reliability'' (not ''functionality'' or ''compatibility'') as
+  the correct name for a ''stayed connected every time since'' claim.
+
+
+  No other rule or example from qe5 is changed. This round intentionally avoids the money/price rule,
+  the ''design'' rule, and any new top-level facet name (color, sturdiness, stability) since qe6 and qe7
+  already tried variants of each of those and both rounds regressed (0.4990 and 0.4899); it also avoids
+  re-touching ''functionality'' itself, which has already had three rounds of direct edits (qe3 allow-list:
+  improved; qe4 hard cap: regressed; qe5 allow-list expansion + reframe: modest gain) and is left untouched
+  here to isolate this round''s one new lever.'
+version: qe8
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'sizing accuracy', 'battery life', 'appearance', 'design', 'build quality', 'reliability', 'portability'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, and any interaction with the seller or manufacturer after purchase -- customer service, customer support, technical support, response time to inquiries, communication, warranty claims -- none of these are aspects of the product itself. Also ignore the accuracy of the listing/product description and where the product shipped from or was sourced -- these describe how it was SOLD, not what the product IS; if the review complains the listing was misleading, extract only the underlying physical fact it turned out to have (e.g. a part that doesn't work as claimed), never a 'description accuracy' or 'source' facet. Also ignore money entirely: any mention of cost, price, or affordability ('worth it', 'good value', 'reasonable price', 'overpriced', 'expensive', 'cheap', 'pricey', a dollar amount) never creates a 'value', 'value for money', or 'price' facet, even when cost is framed as a quality judgment.
+  - General verdict language with no specific dimension attached -- 'must-have', 'worth it', 'delighted', 'satisfied', overall recommendations -- is never a facet on its own ('value', 'user satisfaction', 'recommendation' are not valid facets); only extract a facet when the review names or clearly implies a specific product dimension.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - How the product looks BY DESIGN (color, style, aesthetics, finish) is 'appearance' -- a common dimension that is easy to miss when the review is mostly praise ("looks great", "love the look"). If the review itself talks about the product's overall shape, form, or design choices (or literally uses the word "design"), name that facet 'design' instead of 'appearance' -- they are scored as separate gold facets. Damage, defects, or physical state on arrival (cracked, scratched, burned, broken, stained, dirty) is a different facet, 'condition' -- never call physical damage 'appearance'.
+  - Items or parts bundled with the product are 'included accessories'.
+  - Prefer generic canonical names over task-specific compounds so near-synonyms don't fragment: 'effectiveness' (not 'cleaning power', 'scalp massage effectiveness'), 'size' for whether the product's own dimensions/capacity are adequate for its purpose (not 'sizing accuracy', which is reserved for whether the ordered size runs true to expectation, and not 'portability', which is how easy the product is to carry, move, or store because of its own compactness or weight), 'build quality' for how solid or well-assembled the product feels right now (distinct from 'durability', which is specifically about holding up over time), 'reliability' for whether the product keeps working without failing, breaking, or malfunctioning over time (a part slipping loose, a device dying, intermittent glitches -- distinct from both 'build quality' and 'durability'), 'seal' for whether a lid, gasket, or fitting holds a liquid/air-tight closure without leaking (distinct from general 'build quality'). 'functionality' is NOT a catch-all default -- use it ONLY for a single holistic 'do the promised features work at all' verdict, never for each individual mechanism a review mentions. If the review names or clearly implies a specific mechanism instead -- suction, grip/traction, stability, mounting, heat management, transfer speed, cord/wiring, hand/needle alignment, software or app behavior, setup/configuration, compatibility, power or strength, clamp or clip strength, ease of use, ease of attachment, ease of cleaning -- use that specific name, not 'functionality'. When a review raises several distinct working-parts complaints or praises, give each one its own specific name from this list (or a natural specific noun phrase if none fits) rather than repeating 'functionality' for all of them.
+  - Facets apply to any product type, including media (books, movies, games): 'plot', 'characters', 'writing quality' are valid facets under the same schema.
+  - Deduplicate facets: never output the same facet name twice in one response, even if the review expresses mixed or conflicting opinions about it -- merge into a single entry (pick the dominant sentiment, or 'neutral' if genuinely mixed). This also applies across near-synonym names, not just identical ones: if a single remark could be labeled with more than one near-synonym facet describing the same underlying observation (e.g. one comment about solid, well-made construction could be called 'build quality', 'material quality', or 'durability'), pick the single best-fitting name and extract it once -- never emit two or three near-synonyms for one observation. Only extract a facet when the review gives clear, specific textual support for an opinion about that dimension -- do not add speculative or filler facets just to round out the list toward the maximum. At most 6 facets, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This blender looks sleek on the counter and matches the rest of my kitchen. It came with three different-sized jars and a recipe booklet, which was a nice bonus. The plastic base feels flimsy and rattles a bit at high speed, and after about six weeks of daily use one of the gears started grinding and it eventually stopped turning on. When it did work, it pureed frozen fruit smoothly every time.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the counter
+    - facet: included accessories
+      polarity: positive
+      evidence: came with three different-sized jars and a recipe booklet
+    - facet: build quality
+      polarity: negative
+      evidence: plastic base feels flimsy and rattles a bit at high speed
+    - facet: durability
+      polarity: negative
+      evidence: after about six weeks of daily use one of the gears started grinding and it eventually
+        stopped turning on
+    - facet: effectiveness
+      polarity: positive
+      evidence: pureed frozen fruit smoothly every time
+- user: |-
+    The screen is honestly a bit too small for comfortable reading, though the included stand fits it perfectly and holds it at a nice angle. It was pricier than I expected, but every feature promised in the listing actually works as advertised.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: a bit too small for comfortable reading
+    - facet: fit
+      polarity: positive
+      evidence: the included stand fits it perfectly and holds it at a nice angle
+    - facet: functionality
+      polarity: positive
+      evidence: every feature promised in the listing actually works as advertised
+- user: |-
+    This phone mount has incredible suction and never loses its grip on the dashboard, even over bumps, so my phone stays perfectly stable for the whole drive. Sadly, after about a month the ball joint started slipping and now it droops down no matter how tight I turn it -- feels like something inside just gave out.
+  assistant:
+    aspects:
+    - facet: suction
+      polarity: positive
+      evidence: incredible suction and never loses its grip
+    - facet: stability
+      polarity: positive
+      evidence: phone stays perfectly stable for the whole drive
+    - facet: reliability
+      polarity: negative
+      evidence: the ball joint started slipping ... feels like something inside just gave out
+- user: |-
+    The package arrived with the corner of the case cracked and one panel scratched, so it didn't look new out of the box, but the color and finish are exactly the elegant matte black shown in the pictures. I emailed support about the crack and they never responded, which was frustrating. It's a bit pricey for what it is, but I'm keeping it since everything works.
+  assistant:
+    aspects:
+    - facet: condition
+      polarity: negative
+      evidence: the corner of the case cracked and one panel scratched
+    - facet: appearance
+      polarity: positive
+      evidence: the color and finish are exactly the elegant matte black shown in the pictures
+    - facet: functionality
+      polarity: positive
+      evidence: everything works
+- user: |-
+    This travel speaker is compact enough to toss in a backpack and the matte design looks sleek without being flashy. Setting it up over Bluetooth took a couple of tries because the pairing button is tiny and unlabeled, but once paired it connects instantly every time after that. It was more expensive than I expected for something this small, but honestly worth it for how loud and clear it sounds even outdoors.
+  assistant:
+    aspects:
+    - facet: portability
+      polarity: positive
+      evidence: compact enough to toss in a backpack
+    - facet: design
+      polarity: positive
+      evidence: the matte design looks sleek without being flashy
+    - facet: setup
+      polarity: negative
+      evidence: took a couple of tries because the pairing button is tiny and unlabeled
+    - facet: reliability
+      polarity: positive
+      evidence: connects instantly every time after that
+    - facet: sound quality
+      polarity: positive
+      evidence: how loud and clear it sounds even outdoors
+- user: |-
+    The listing said this pitcher was dishwasher-safe, but the lid warped after just one cycle in mine, so now I hand wash everything. Water also drips out around the spout every time I pour, which defeats the point since I bought it specifically to avoid spills. It shipped from a warehouse pretty far away and took longer than expected to arrive, though customer service refunded part of the shipping fee when I asked.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: negative
+      evidence: the lid warped after just one cycle
+    - facet: seal
+      polarity: negative
+      evidence: Water also drips out around the spout every time I pour
+- user: |-
+    The mount itself feels solid and well-made, like it's built from thick, sturdy metal rather than cheap plastic. It paired with my phone over Bluetooth on the first try and has stayed connected every time since.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: positive
+      evidence: feels solid and well-made, like it's built from thick, sturdy metal rather than cheap
+        plastic
+    - facet: reliability
+      polarity: positive
+      evidence: paired with my phone over Bluetooth on the first try and has stayed connected every time
+        since

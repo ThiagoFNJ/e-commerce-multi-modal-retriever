@@ -1,0 +1,199 @@
+parent: qb3
+created: '2026-07-24'
+status: candidate
+model: claude-sonnet-5
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Current best is qb3 (dev F1 0.575). Both children tried since then regressed: qb4 (broadened the
+  ''color'' trigger to catch adjectival color language) fell to 0.5611, and qb5 (rewrote the whole build-quality/durability/reliability
+  rule into four dimensions and added ''strength'') fell to 0.5642 -- so this round avoids repeating either
+  specific edit and instead targets the two largest error masses that neither branch touched with a worked
+  example: ''functionality'' (FP10+FN6=16) and ''durability'' (FP12+FN4=16), both still larger than or
+  equal to ''appearance'' region masses once you look at durability alone. qb3''s own notes already established
+  the pattern that text-only rules don''t transfer without a worked example (that''s how the effectiveness-collapse
+  example got added) -- but that fix was never applied to ''functionality'' itself, and B07K2SWHGN#4 proves
+  it: the rule''s own worked exemplar word (''dispensing'') is right there in the text, and the model
+  still predicted ''functionality'' instead. Same gap for durability/reliability: B083GMRDWB#4 and B07ZHYS7MD#6
+  both describe a product that ''no longer works'' / ''didnt work very long'' -- textbook reliability
+  language -- yet both get labeled ''durability'', and there is no existing few-shot example anywhere
+  in the prompt that contrasts the two. I added one new synthetic example for each, without rewriting
+  the underlying rule text for durability (since qb5''s full rewrite of that exact rule already regressed
+  the score, only the missing-example lever is untested). While fixing ''functionality'' I also caught
+  a second, related failure: B076GTTQLJ#4 (blue-light glasses) and B07ZKF8RSG#9 (pasta shape) both show
+  gold preferring ''effectiveness'' when the ''specific mechanism'' being described IS the product''s
+  core purpose, not a secondary part -- the current rule''s push toward naming mechanisms was over-firing
+  on these cases. Added an explicit core-purpose exception and folded a demonstration of both halves (secondary-part
+  naming + core-purpose effectiveness) into one new synthetic example so the exception doesn''t just re-broaden
+  ''functionality'' into a catch-all. Also added ''performance'' to the same last-resort bucket and ''camera''
+  to the mechanism-name examples, evidenced by B0787V183F#4 (gold ''camera'', predicted generic ''performance'').
+  Separately, split ''style'' out as its own visual/aesthetic facet distinct from ''design'': the current
+  rule text literally routes all style-language into the ''design'' output, so gold''s ''style'' facet
+  could never be predicted at all (aggregate FN4, FP0, a clean bug) -- evidenced by two different worst-scoring
+  reviews, B073D6V79G#10 and B07MVGFZV9#2. This is a different lever than qb4''s failed edit (which broadened
+  an *input trigger* for an existing facet); this unlocks an output facet name the text was accidentally
+  suppressing, closer in kind to qb3''s own successful color/design split. Also reinforced (text-only)
+  the customer-support exclusion with ''even when described at length'', since B07ZHYS7MD#6 shows a long
+  unresponsive-support narrative still leaking through the existing exclusion (aggregate FP5). I left
+  several things untouched: the adjectival-color trigger issue (B093Y8K7D8#7, ''colorful'' not mapping
+  to ''color'') because qb4 already tried broadening that exact trigger and regressed, and I have no evidence
+  isolating what specifically hurt, so touching it again would be a guess rather than evidence-grounded;
+  the book-review domain gap (1547602589#11, gold ''engagement''/''emotional impact''/''excitement'')
+  because it''s single-review evidence and none of those three names appear in the top-15 aggregate FN
+  list; ''price''/''value for money'' (FP9/FP7, both larger than most facets I did touch) because no review
+  in this packet''s worst-20 shows how the collision happens; and the size/fit confusion because the packet
+  contains two directly contradictory instances (B01BI85NTA#7 gold fit/pred size vs B07RYK3J41#6 gold
+  size/pred fit) against a rule that already states a reasonable distinction, which looks like application
+  noise rather than a rule gap.'
+change_summary: '1. Extended the ''functionality'' rule to also cover ''performance'' as a last-resort
+  label, added ''camera'' to the specific-mechanism example list, and added an explicit ''effectiveness''
+  exception for when the named mechanism IS the product''s core purpose rather than a secondary part --
+  targets functionality''s combined FP10+FN6=16 (still failing to transfer per B07K2SWHGN#4, which is
+  literally the rule''s own ''dispensing'' exemplar), B0787V183F#4 (camera mislabeled ''performance''),
+  and the effectiveness-vs-specific-mechanism confusion in B076GTTQLJ#4 and B07ZKF8RSG#9.
+
+
+  2. Added a new synthetic few-shot example (water filter pitcher) demonstrating both halves of edit 1
+  in one review: naming a secondary mechanism (''lid mechanism'') instead of defaulting to ''functionality'',
+  and using ''effectiveness'' for the product''s core purpose instead of a narrow mechanism name.
+
+
+  3. Added a new synthetic few-shot example (recliner) contrasting ''durability'' (wear-over-time) against
+  ''reliability'' (stopped working/malfunction), with no change to the underlying rule text -- targets
+  durability''s aggregate FP12+FN4=16, the single largest FP facet in the whole run, evidenced directly
+  by B083GMRDWB#4 and B07ZHYS7MD#6 (both ''stopped working'' cases mislabeled ''durability'' instead of
+  gold ''reliability''); kept the rule text itself unchanged since qb5''s full rewrite of this exact rule
+  (adding ''strength'' + trigger-phrase anchors) already regressed the score, so only the missing worked-example
+  lever is being tried this round.
+
+
+  4. Split ''style'' out as its own visual/aesthetic facet name, distinct from ''design'' -- the prior
+  text routed all style-language straight into ''design'', so gold''s ''style'' facet could never be predicted
+  (aggregate FN4, FP0); evidenced by B073D6V79G#10 (''Perfect watch for nice occasion'') and B07MVGFZV9#2
+  (''Goes well with my other jewelry'').
+
+
+  5. Reinforced the customer-support exclusion with ''even when the interaction is described at length''
+  -- targets aggregate customer support FP5, evidenced by B07ZHYS7MD#6 where a long unresponsive-support
+  narrative still leaked through the existing exclusion.'
+version: qb6
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'too small to hold much' -> facet 'size', polarity 'negative'. 'runs small, order a size up' -> facet 'sizing accuracy', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, whether it's worth the money, listing/description accuracy (what the seller claimed vs what arrived is not itself a property of the product -- but if it caused a real physical mismatch, name that physical dimension instead, e.g. expecting a self-adhesive item and getting one that must be mounted is an 'installation' issue), and customer/technical support (including support responsiveness, even when the interaction is described at length) -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Only extract facets of the product actually being reviewed. Reviews sometimes describe or compare a different, separately-named product (a competitor, an alternative, something else the reviewer owns) -- do not extract facets for that other product's features, even if discussed at length; extract only what is said about the item under review.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Two commonly-confused sizing dimensions -- use the one the review actually describes: 'sizing accuracy' = whether the item runs true to its label or to expectations (runs small/large, order a size up/down, tag says one size but it measures or fits as another); 'size' = the item's absolute physical dimensions or capacity as a feature in itself, with no label or expectation being contradicted (e.g. 'the cups are small', 'too small to hold much'). 'fit' is a further separate dimension: how the item fits the body or its intended space once worn or installed (snug, loose, comfortable) -- use 'fit' only when the review is about that experience, not about the size label.
+  - 'condition' = the physical state THIS specific unit arrived in or has since fallen into (scratched, dented, torn, dirty/filthy, defective on arrival) -- a one-off, unit-specific observation. Distinct from 'appearance' (the item's designed visual style, look, or color) and from a general resistance or susceptibility property the review is characterizing, e.g. 'scratch resistance' -- if the review is testing or describing how easily the material scratches, dents, or wears in general use (not just reporting damage on the unit received), name that property, not 'condition'.
+  - Prefer the single broadest canonical dimension over several narrow compound ones, but only when multiple sentences describe facets of the SAME underlying quality -- e.g. prefer 'effectiveness' over 'pain relief effectiveness' + 'scalp massage effectiveness'. Do NOT collapse genuinely distinct product dimensions into one facet just because they appear in the same sentence or review -- e.g. an item that both wobbles when standing and has parts that detach is two facets ('stability' and 'part fit'), not one 'build quality'; a shirt that runs large but looks great is two facets ('sizing accuracy' and 'appearance'), not one.
+  - 'stability' = whether the item wobbles, rocks, tips over, or feels unsteady in use or when standing/mounted -- distinct from 'build quality'/'sturdiness' (how solidly it's made or assembled) and 'durability' (wear over time).
+  - Three commonly-confused construction/longevity dimensions -- use the one the review actually describes: 'build quality' (call it 'sturdiness' when the review's own words are 'solid'/'sturdy'/'flimsy' rather than about assembly) = how solidly or well the item is made or assembled (falls apart, parts break off, flimsy, cheap construction, right out of the box); 'durability' = how well it holds up to wear from repeated or prolonged use over time; 'reliability' = whether it keeps working without malfunctioning, defects, or breakdowns over time.
+  - Visual/aesthetic look: use the review's own more specific term when it names one -- 'color' when the opinion is specifically about color (not comparing received color/pattern to what was advertised or pictured -- that's 'color accuracy'); 'design' when the review is about how the item is engineered or laid out to look the way it does (pattern, silhouette, construction-driven styling); 'style' when the review is judging fashion sense, taste, or how well the item suits an occasion or coordinates with other things, independent of its construction (stylish, goes well with..., classic look, right for the occasion). Fall back to plain 'appearance' only for general look/attractiveness statements that don't single out color, design, or style, e.g. 'I really like the retro look'.
+  - 'functionality' and 'performance' are last-resort labels for whether the product works or performs as intended overall. When the review names a specific part, mechanism, or capability (a lid, a zipper, a dispenser, a camera, how many different ways it can be used), name that instead -- e.g. 'lid mechanism', 'dispensing', 'camera', 'versatility' -- rather than defaulting to 'functionality'/'performance'. Exception: if what's being judged IS the product's core purpose rather than a secondary part -- e.g. blue-light glasses actually filtering out blue light, a pain-relief device actually relieving pain, a pasta maker producing the shape of noodle it claims to -- use 'effectiveness' instead of naming that core mechanism (see the broadest-dimension rule above).
+  - If the review mentions parts, tools, cables, or extras that came bundled with the product, that's 'included accessories'.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: sizing accuracy
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This whodunit kept me guessing until the last chapter - the twists never felt cheap. I did think the love-triangle subplot dragged on too long, and a couple of the secondary characters felt flat and interchangeable. Still, the prose was crisp and never got in the way of the story.
+  assistant:
+    aspects:
+    - facet: plot
+      polarity: positive
+      evidence: kept me guessing until the last chapter
+    - facet: characters
+      polarity: negative
+      evidence: secondary characters felt flat and interchangeable
+    - facet: writing quality
+      polarity: positive
+      evidence: the prose was crisp
+- user: |-
+    The color is exactly like the photos and I really like the retro look, but mine arrived with a scratch across the front and one corner dented.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: I really like the retro look
+    - facet: condition
+      polarity: negative
+      evidence: arrived with a scratch across the front and one corner dented
+- user: |-
+    The design is so sleek and modern, and I love the deep navy color. Wish the strap was more adjustable though.
+  assistant:
+    aspects:
+    - facet: design
+      polarity: positive
+      evidence: The design is so sleek and modern
+    - facet: color
+      polarity: positive
+      evidence: I love the deep navy color
+    - facet: adjustability
+      polarity: negative
+      evidence: Wish the strap was more adjustable
+- user: |-
+    This cream really helped calm the redness on my cheeks, and the itching on my arms was gone within a few days too. A bit pricey compared to other brands, but worth it for how well it works.
+  assistant:
+    aspects:
+    - facet: effectiveness
+      polarity: positive
+      evidence: really helped calm the redness... the itching... was gone within a few days
+- user: |-
+    The lid on this pitcher pops open if you tilt it even slightly, which is annoying when pouring. That said, the filter itself does its job -- my tap water tastes so much cleaner and there's no more chlorine smell.
+  assistant:
+    aspects:
+    - facet: lid mechanism
+      polarity: negative
+      evidence: lid on this pitcher pops open if you tilt it even slightly
+    - facet: effectiveness
+      polarity: positive
+      evidence: tap water tastes so much cleaner and there's no more chlorine smell
+- user: |-
+    After six months of daily use the fabric on the seat has started to thin and fade, but the recliner mechanism itself has never once jammed or failed to lock in place.
+  assistant:
+    aspects:
+    - facet: durability
+      polarity: negative
+      evidence: fabric on the seat has started to thin and fade
+    - facet: reliability
+      polarity: positive
+      evidence: recliner mechanism itself has never once jammed or failed to lock

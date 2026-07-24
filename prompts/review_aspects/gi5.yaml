@@ -1,0 +1,99 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two clean, evidence-grounded levers, both deliberately narrow after four rounds where every attempt
+  to add explicit facet-vocabulary rule bullets (gi1: build/material/durability/reliability/functionality/effectiveness/fitment/size
+  distinctions; gi4: appearance + build-quality bullets) made F1 worse (0.4889, 0.4939) relative to the
+  v2 baseline (0.5462). That pattern says this model does not follow added prose distinctions well; it
+  follows demonstrations. The one prior attempt that stayed close to baseline was gi3 (0.5441), which
+  renamed ''sizing accuracy''->''size'' in the system rules only -- per its own change note it touched
+  ''rule 1''s illustrative list and rule 2''s worked example'' but did not mention the few-shot list,
+  so the actual demonstrated example (few-shot #3) still says facet ''sizing accuracy'', directly contradicting
+  the rule it just changed. That is the most likely reason gi3 landed at parity instead of improving:
+  the two channels disagreed. Edit 1 completes that rename consistently everywhere (rule 1, rule 2''s
+  worked example, AND few-shot #3) so instruction and demonstration agree, targeting the largest single
+  1:1 facet-naming mismatch in the data (FP ''sizing accuracy''=9, FN ''size''=10; confirmed directly
+  in B01MR1IBLI#6 where gold=''size'' but pred=''sizing accuracy''). Edit 2 adds one synthetic few-shot
+  example (no dev review text copied) rather than a new rule, covering the three next-largest FN masses
+  at once: ''appearance'' (FN=18, the single largest error mass in the whole report and currently absent
+  from every example), ''build quality'' (FN=15, currently only ever demonstrated implicitly and confused
+  in predictions with ''material quality''/''texture''/''durability''), and ''effectiveness'' (FN=11,
+  never predicted even once despite recurring as the sole gold facet in three of the twenty worst-scoring
+  reviews -- B0837CR4XK#6, B08L4MT463#8, B07ZKF8RSG#9 -- because the model has no example of ''does it
+  do its core job'' as a facet and substitutes narrower/wrong facets like ''fit'', ''mobility'', ''texture'').
+  Both edits are additive/renaming only, keep the prompt well under double its current length, and avoid
+  re-adding the rule-bullet pattern that has twice failed.'
+change_summary: '1) Renamed the ''sizing accuracy'' facet to ''size'' consistently in rule 1''s illustrative
+  facet list, rule 2''s worked example, and few-shot #3 (previously only the system rules were renamed
+  in gi3, leaving few-shot #3 contradicting the rule) -- targets the largest facet-naming mismatch (FP
+  ''sizing accuracy''=9 / FN ''size''=10). 2) Added a new synthetic 5th few-shot example (desk lamp; not
+  copied from any dev review) demonstrating ''appearance'' (FN=18, largest error mass, previously undemonstrated),
+  ''build quality'' (FN=15, distinct from material quality/durability), and ''effectiveness'' (FN=11,
+  never predicted, recurs as sole gold facet in 3/20 worst reviews) -- taught via example rather than
+  a new rule bullet, since rule-bullet edits for facet distinctions (gi1, gi4) both reduced F1 below baseline.'
+version: gi5
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    This desk lamp looks sleek and modern, exactly like the photos, and it's built like a tank - no rattling or flex when I adjust the arm. But it barely brightens a small room, so it's not doing what I bought it for.
+  assistant:
+    aspects:
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek and modern, exactly like the photos
+    - facet: build quality
+      polarity: positive
+      evidence: built like a tank - no rattling or flex when I adjust the arm
+    - facet: effectiveness
+      polarity: negative
+      evidence: barely brightens a small room, so it's not doing what I bought it for

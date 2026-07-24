@@ -1,0 +1,108 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Both prior rounds targeted this same evidence (the durability/material-quality/texture/build-quality
+  naming cluster, size vs fit vs sizing-accuracy, and introducing an ''appearance'' facet) by adding explicit
+  system-prompt rules -- gi1 with a full canonical-vocabulary table, gi2 with a condensed version plus
+  an added ''one facet per dimension'' rule -- and BOTH scored below the v2 baseline (0.489 and 0.510
+  vs 0.546), with the more verbose gi1 scoring worse than the leaner gi2. That monotonic relationship
+  (more added rule text -> bigger score drop) is itself evidence: for this extractor model, growing the
+  system prompt with abstract facet-naming instructions appears to degrade extraction quality faster than
+  any naming-vocabulary mismatch it fixes, plausibly because a smaller instruction-following model over-applies
+  or gets confused by declarative rename rules rather than reliably conditioning on them. This round tests
+  that hypothesis directly by holding the system prompt at (in fact fractionally under) v2''s length --
+  reapplying only the single lowest-risk, most unambiguous rename from gi2''s bundle (sizing accuracy
+  -> size, justified by the near-exact overlap between the top FP ''sizing accuracy'' (9) and top FN ''size''
+  (10) counts) in isolation, so its effect is no longer confounded by the other rule additions -- and
+  otherwise pushing all remaining fixes through a single new few-shot example rather than new rules. The
+  new example targets the two next-largest, still-unaddressed error masses with an invented (not evidence-copied)
+  review: ''appearance'' (18 missed gold facets, and the current prompt has zero rules or examples suggesting
+  this dimension exists at all -- directly explaining misses like the bling/watch-band review and the
+  ''it was pretty'' review) and per-part fragmentation (a zipper-failure-plus-fraying defect written as
+  one aggregated ''build quality'' facet rather than two, mirroring the B07CXP6F5J failure mode where
+  five per-part facets were predicted against two gold facets, fitment and build quality). Effectiveness/functionality
+  (12+11 FN), included accessories (6 FN), reliability/fitment/compatibility, and the durability/material-quality/texture/build-quality
+  core cluster are deliberately left untouched this round: the first three are real gaps but adding rules
+  for them now would re-run the exact experiment that just failed twice; the last cluster has already
+  absorbed two failed, evidence-grounded rule-based attempts and needs a different lever (probably example-only,
+  in a future round) rather than a third rule-based pass.'
+change_summary: '1) System prompt reverted to v2 baseline text verbatim except renaming the ''sizing accuracy''
+  facet to ''size'' in rule 1''s illustrative list and rule 2''s worked example -- net effect is the prompt
+  is the same length as v2 (slightly shorter, in fact), deliberately not growing it further after two
+  rounds where system-prompt growth correlated with score drops.
+
+  2) Modified few-shot #3: renamed its facet from ''sizing accuracy'' to ''size'', isolating this single
+  naming fix from the other changes (one-facet-per-dimension rule, canonical-naming-pairs table) that
+  gi2 bundled it with, so its effect can be measured cleanly this round.
+
+  3) Added a new synthetic few-shot #5 (zipper failure + fraying + navy color review) that teaches, by
+  demonstration only, (a) ''appearance'' as a valid facet for aesthetic/style commentary -- targeting
+  the 18-count top missed-gold-facet mass -- and (b) aggregating multiple related defect mentions into
+  ONE ''build quality'' facet instead of one-facet-per-part -- targeting the fragmentation seen in the
+  worst-scoring B07CXP6F5J review and contributing to the build-quality FN mass (15). No new system rules
+  were added for appearance, effectiveness/functionality, or included accessories this round; these are
+  deferred pending this round''s result.'
+version: gi3
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    The zipper on the front pocket snapped off after only two weeks, and the fabric started fraying at the same seam. On the plus side, the color is a lovely deep navy that goes with everything, and shipping was fast.
+  assistant:
+    aspects:
+    - facet: build quality
+      polarity: negative
+      evidence: The zipper on the front pocket snapped off after only two weeks, and the fabric started
+        fraying at the same seam
+    - facet: appearance
+      polarity: positive
+      evidence: the color is a lovely deep navy that goes with everything

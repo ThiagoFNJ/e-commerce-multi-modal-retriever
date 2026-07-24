@@ -1,0 +1,123 @@
+parent: v2
+created: '2026-07-24'
+status: candidate
+model: gemma4:12b-it-bf16
+experiment: honest-loop
+reflector: sonnet subagent, template_v1
+notes: 'Two facet names are simultaneously the biggest false-positive AND false-negative masses -- ''build
+  quality'' is a top-6 FP (6) while also the #2 missed gold facet (15), and ''durability'' is the single
+  largest FP (13) while also missed 4 times -- which is the signature of a naming mismatch rather than
+  a coverage gap: the model is fragmenting the general ''is this well built'' judgment into narrower siblings
+  (''material quality'' FP=9, ''texture'' FP=8, ''finish'' FP=3) that don''t align with gold''s umbrella
+  term at the 0.80 similarity threshold (see B00NYAD2J4#4, B07GXM22ZD#9 where gold ''build quality''+''softness''
+  was predicted as ''material quality''+''texture''). The same pattern shows up for ''ease of installation''
+  (FP=4) vs gold''s bare ''installation'' (FN=5, B003VOX1XU#4), ''sizing accuracy'' (FP=9, present in
+  EVERY few-shot example''s own wording) vs gold''s ''size'' (FN=10, the single largest missed-gold mass)
+  and ''fit'' (FN=7), and ''compatibility''/''performance'' vs gold''s ''fitment''/''functionality'' (B07PH18JS2#1).
+  ''appearance'' is the single largest missed-gold facet (18) and never appears as a predicted facet name
+  at all in the evidence, despite reviews explicitly discussing looks/style/cosmetic issues (B00IN9W73S#5,
+  B01MR1IBLI#6, B07Y5WMGGG#12) -- it''s simply missing from the model''s vocabulary. Separately, ''reliability''
+  (FN=7) is getting mislabeled as ''durability'' when a product stops working intermittently with no physical
+  damage (B07P7Z12DV#8), so the two need an explicit distinction. B07CXP6F5J#7 (f1=0.0, fp=5) shows the
+  model emitting one facet per broken part (''front fender fit'', ''number plate fit'', ''rear fender
+  alignment'', ''side plates fit'') where gold uses a single consolidated ''fitment'' facet -- an over-fragmentation
+  problem distinct from naming, addressed with an explicit consolidation rule. Finally B09431D2DX#3 (a
+  book review) scored 0/3 recall with an empty prediction list -- the current ''product-intrinsic only''
+  framing, which enumerates physical exclusions (delivery, shipping, price), appears to be read by the
+  model as implying the product itself must be physical, so media-product dimensions (plot, characters,
+  writing quality) are explicitly called out as legitimate. All edits are vocabulary/scope clarifications
+  grounded in the FP/FN tables and worst-review transcripts above; no hypothetical failure modes were
+  targeted, and the two few-shot changes stay within the 2-example-change budget.'
+change_summary: '1) Added a ''preferred facet vocabulary'' rule block distinguishing build quality vs
+  material quality/texture/finish, durability vs reliability, functionality vs effectiveness, fitment
+  vs compatibility, size vs fit, and introducing ''appearance'' -- targets the FP/FN masses where the
+  same underlying dimension was split across a broad gold name and several narrow predicted synonyms.
+  2) Added a rule to name process facets plainly (''installation'' not ''ease of installation'') -- ''ease
+  of installation'' (FP=4) vs gold ''installation'' (FN=5). 3) Added a consolidation rule: one facet per
+  shared underlying complaint, not one per repeated part/instance -- targets B07CXP6F5J#7''s 5-facet over-fragmentation
+  of a single fitment complaint. 4) Clarified that product-intrinsic dimensions extend to creative/media
+  products (plot, characters, writing quality, entertainment value) -- targets B09431D2DX#3''s fully-empty
+  prediction on a book review. 5) Rewrote few-shot example 3: facet renamed ''sizing accuracy'' -> ''size'',
+  removing the source of the in-prompt vocabulary the model was echoing into a name gold never uses. 6)
+  Added one new synthetic few-shot example (wall-mounted appliance, not copied from any dev review) demonstrating
+  fitment consolidation across repeated parts, build-quality-vs-reliability separation with no durability
+  facet emitted (nothing physically broke), bare ''installation'' naming, and ''appearance'' as its own
+  dimension.'
+version: gi1
+system: |-
+  You extract product aspects from one customer review.
+
+  Rules:
+  - A facet is a short lowercase English noun phrase (1-4 words) naming a DIMENSION of the product: 'arch support', 'waterproofing', 'size', 'battery life'.
+  - Polarity-neutral: name the dimension, never the opinion or the value. 'runs small' -> facet 'size', polarity 'negative'.
+  - Product-intrinsic only: ignore delivery, shipping, packaging condition, the seller, the price paid, and customer service -- they are not aspects of the product. For creative/media products (books, movies, games, music) product-intrinsic dimensions include things like plot, characters, writing quality, and entertainment value -- treat these the same as physical dimensions; don't return an empty list just because the product isn't physical.
+  - Never the product category itself ('boots' is not a facet of boots); no brand names.
+  - Facets are always English, even when the review is not.
+  - 'evidence' is a short verbatim quote from the review supporting the facet.
+  - Prefer these common dimension names over inventing narrow synonyms, when the review's complaint matches one:
+    - 'build quality' for overall construction/craftsmanship ('feels sturdy', 'well made', 'flimsy') -- not 'material quality', 'texture', or 'finish' unless the review names a specific material property rather than the construction as a whole.
+    - 'durability' only when something physically wore out, broke, or got damaged from use; 'reliability' when it stops working intermittently or inconsistently over time with no physical damage -- these are different facets, don't conflate them.
+    - 'functionality' for whether a feature works as designed; 'effectiveness' for whether the product achieves the result/outcome it promises -- these are different facets.
+    - 'fitment' for whether the product physically fits/attaches to what it's meant to fit (a mount, a vehicle part, a socket, a frame); reserve 'compatibility' for software/electrical/format compatibility, not physical fit.
+    - 'size' for the item's dimensions running big/small/as expected; 'fit' for how a worn/attached item sits on the body or target shape once in place -- these are different facets.
+    - 'appearance' for how the product looks or its style overall (not size, not build).
+    - name process-oriented facets plainly ('installation', 'use') rather than prefixing with 'ease of'.
+  - If a review lists several instances of the SAME underlying complaint (several parts that don't fit, several features that misbehave), emit ONE facet for that dimension, not one per instance.
+  - Deduplicate facets. At most 6, the most salient. If the review discusses no concrete product dimension, return an empty list.
+few_shot:
+- user: |-
+    These boots have amazing arch support and great grip on wet trails, but they are not really waterproof - my socks were soaked after an hour of light rain.
+  assistant:
+    aspects:
+    - facet: arch support
+      polarity: positive
+      evidence: amazing arch support
+    - facet: traction
+      polarity: positive
+      evidence: great grip on wet trails
+    - facet: waterproofing
+      polarity: negative
+      evidence: not really waterproof - my socks were soaked
+- user: |-
+    Love it!!! Five stars.
+  assistant:
+    aspects: []
+- user: |-
+    Runs small, order a size up. Also the box arrived crushed but the seller shipped a replacement quickly.
+  assistant:
+    aspects:
+    - facet: size
+      polarity: negative
+      evidence: Runs small, order a size up
+- user: |-
+    Muy comodo y el material se siente de buena calidad, aunque el color es mas oscuro que en las fotos.
+  assistant:
+    aspects:
+    - facet: comfort
+      polarity: positive
+      evidence: Muy comodo
+    - facet: material quality
+      polarity: positive
+      evidence: el material se siente de buena calidad
+    - facet: color accuracy
+      polarity: negative
+      evidence: el color es mas oscuro que en las fotos
+- user: |-
+    Setup took forever because none of the four wall anchors lined up with the mounting holes on the bracket, so I had to redrill everything myself. Once mounted, the unit feels solidly made and doesn't wobble at all. It ran perfectly for the first month, but lately it randomly shuts off mid-use and then starts back up a few minutes later for no reason. It looks sleek on the wall and matches my kitchen decor.
+  assistant:
+    aspects:
+    - facet: installation
+      polarity: negative
+      evidence: I had to redrill everything myself
+    - facet: fitment
+      polarity: negative
+      evidence: none of the four wall anchors lined up with the mounting holes
+    - facet: build quality
+      polarity: positive
+      evidence: feels solidly made and doesn't wobble at all
+    - facet: reliability
+      polarity: negative
+      evidence: randomly shuts off mid-use and then starts back up a few minutes later
+    - facet: appearance
+      polarity: positive
+      evidence: looks sleek on the wall and matches my kitchen decor
