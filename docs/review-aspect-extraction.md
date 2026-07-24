@@ -439,7 +439,48 @@ protocol, is a defensible mid-band result for a 12B local extractor. Journey, en
 end: 0.469 (v0 on qwen3:8b, dev) → 0.584 (gemma4:12b + gm10, held-out test).
 
 The extraction stage is **closed**: engine, gold set, optimization, model selection, and
-the held-out number all final. Test-350 must not be touched again (§5.3).
+the held-out number all final. Test-350 must not be touched again (§5.3) — the single
+documented exception (extractor materialization change, §5.8) was exercised on 2026-07-24.
+
+### 5.8 BF16 rematerialization — remote loops and the second (final) test touch (2026-07-24)
+
+Moving extraction to a GCP A100 (vLLM, BF16 safetensors) instead of local Ollama
+(GGUF Q4) changed the *extractor artifact* while §5.7's number was measured on the Q4
+one. Three findings from re-running the full honest protocol (same v0, 10 rounds,
+isolated reflector) on the served materializations:
+
+| series (extractor) | v0 anchor | loop winner (dev) |
+|---|---|---|
+| gemma-4-12B **base** BF16 (checkpoint mixup, kept as ablation) | 0.4104 | gb: ≤ 0.44 |
+| gemma-4-12B-**it** BF16/vLLM | 0.5462 | **gi9: 0.6183** |
+| qwen3-14B BF16/vLLM | 0.4985 | qb8: 0.5866 |
+
+(a) **QAT vs PTQ**: gemma's QAT-q4 anchor tied its BF16 anchor (+0.2 pp) — quantization-
+aware training preserved task quality. Qwen3-14B's post-training Q4_K_M cost **8.1 pp**
+on the identical anchor (0.4171 → 0.4985). Materialization is not a detail; it is part
+of the model identity. (b) The base-vs-instruct gap (~13 pp) dwarfs every other effect
+measured in this project — the accidental `gemma-4-12B` (base) deployment was found
+because Gate 1 (serving equivalence) failed, and is kept as an ablation series.
+(c) Loop dynamics differ by model: qwen regressed from its parent in 5 of 10 rounds
+(hard plateau near 0.575), gemma-it gained +4.3 pp over rounds 7–9. The recurring
+reflector lesson across both lineages: *a rule without a worked example does not
+transfer*.
+
+**Finalize v2** — because the production extractor changed (Q4→BF16-it, gm10→gi9), the
+§5.3 firewall was opened a second and final time, documented here:
+
+| metric | held-out test-350 (gi9, gemma-4-12B-it BF16/vLLM) |
+|---|---|
+| facet F1 (semantic θ=0.80) | **0.6040** — 95% CI [0.5658, 0.6381] |
+| facet precision / recall | 0.5767 / 0.6340 |
+| polarity accuracy (matched) | **0.9455** — 95% CI [0.9224, 0.9673] |
+| facet F1 (exact string) | 0.5120 |
+
+Dev→test drop is **−1.4 pp** (0.6183 → 0.6040), versus −5.8 pp for gm10 — consistent
+with a less winner's-cursed selection (gi9 won within one lineage, not across ~40
+candidates). The datasheet number for the released corpus artifact is **0.604**; the
+full 3.95M-review pass runs gi9 on gemma-4-12B-it BF16 (vLLM, guided JSON,
+temperature 0), spot A100, resumable via GCS-synced checkpoint.
 
 ---
 

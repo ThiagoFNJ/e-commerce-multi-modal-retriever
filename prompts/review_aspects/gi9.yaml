@@ -1,6 +1,17 @@
 parent: gi8
 created: '2026-07-24'
-status: candidate
+status: winner (finalized 2026-07-24; production prompt for the full-corpus pass)
+scores:
+  dev_semantic_f1: 0.6183
+  test_semantic_f1: 0.6040
+  test_semantic_f1_ci: [0.5658, 0.6381]
+  test_precision: 0.5767
+  test_recall: 0.6340
+  test_polarity_accuracy: 0.9455
+  test_polarity_ci: [0.9224, 0.9673]
+  test_exact_f1: 0.5120
+  n_test: 350
+extractor: google/gemma-4-12B-it, BF16, vLLM (guided json_schema, temperature 0)
 model: claude-sonnet-5
 experiment: honest-loop
 reflector: sonnet subagent, template_v1
