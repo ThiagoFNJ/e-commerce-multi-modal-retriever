@@ -22,7 +22,14 @@ else
 fi
 
 # --- python env: dedicated venv, fully isolated from debian's system packages ---
-apt-get install -y -q python3-venv python3-dev build-essential ninja-build git >/dev/null 2>&1 || true
+# apt may be lock-held by unattended-upgrades right after boot; retry, then verify loudly.
+# (a silently-failed install here cost a night of vLLM crash-looping on missing Python.h)
+for i in $(seq 1 30); do
+  apt-get install -y -q python3-venv python3-dev build-essential ninja-build git && break
+  echo "apt attempt $i failed (lock?); retrying in 10s"; sleep 10
+done
+[ -f "/usr/include/python3.12/Python.h" ] || { echo "FATAL: python3-dev missing"; exit 1; }
+command -v ninja >/dev/null || { echo "FATAL: ninja missing"; exit 1; }
 [ -d "$WORKDIR/venv" ] || /usr/bin/python3 -m venv "$WORKDIR/venv"
 PY="$WORKDIR/venv/bin/python"
 $PY -m pip show vllm >/dev/null 2>&1 || $PY -m pip install -q --upgrade pip vllm
