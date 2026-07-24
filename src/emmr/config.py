@@ -47,7 +47,7 @@ DENSE_ENCODER = "BAAI/bge-small-en-v1.5"        # shared dense encoder (retrieva
 EXTRACTION_MODEL = "gemma4:12b"                  # per-review aspect extraction, local via Ollama
                                                  # (selected by the 5.5 model bracket; qwen3:14b runner-up)
 PROMPTS = ROOT / "prompts"                       # versioned prompt artifacts (one YAML per version)
-EXTRACTION_PROMPT_VERSION = "gm10"               # active prompt: prompts/review_aspects/<v>.yaml
+EXTRACTION_PROMPT_VERSION = "gi9"                # active prompt: prompts/review_aspects/<v>.yaml
                                                  # (5.6 honest-loop winner for gemma4:12b)
 
 # Extraction serving backend. "ollama" = native local API (dev default); "openai" = any
