@@ -8,7 +8,7 @@ echo "=== emmr startup $(date -u +%FT%TZ) ==="
 BUCKET="gs://emmr-9122a143"
 WORKDIR=/opt/emmr
 REPO=https://github.com/ThiagoFNJ/e-commerce-multi-modal-retriever.git
-BRANCH=feat/review-aspect-mining
+BRANCH=master
 MODEL=google/gemma-4-12B-it
 
 mkdir -p "$WORKDIR"
