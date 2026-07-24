@@ -30,7 +30,8 @@ SERIES = {
     "qwen3:8b": ("#2a78d6", "qe"),
     "gemma4:12b": ("#008300", "gm"),
     "qwen3:14b": ("#e87ba4", "qw"),
-    "gemma4 BF16/vLLM": ("#1baf7a", "gb"),
+    "gemma4 base BF16 (ablation)": ("#1baf7a", "gb"),
+    "gemma4-it BF16/vLLM": ("#eb6834", "gi"),
 }
 
 TS = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
