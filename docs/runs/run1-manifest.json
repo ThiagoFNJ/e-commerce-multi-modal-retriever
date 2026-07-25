@@ -1,0 +1,36 @@
+{
+  "run_id": "run1-fullpass-gi9",
+  "purpose": "full-corpus review-aspect extraction, 3,952,486 reviews (ESCI slim parquet)",
+  "extractor": {
+    "model_id": "google/gemma-4-12B-it",
+    "model_snapshot_revision": "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+    "dtype": "bfloat16",
+    "serving": "vLLM 0.25.1, --max-model-len 4096 --gpu-memory-utilization 0.92",
+    "chat_template_sha256_16": "36e3a42e5cf14cd0",
+    "chat_template_provenance": "byte-extracted from Ollama GGUF blob (gemma-4-12B-it QAT-q4 pack)"
+  },
+  "prompt": {
+    "version": "gi9",
+    "sha256_16": "4492a3db59207d7b",
+    "selection": "dev F1 0.6183 (isolated-reflector GEPA, best of gi1-gi10); test-350 F1 0.6040 [0.5658, 0.6381]"
+  },
+  "client_sampling_params": {
+    "temperature": 0,
+    "response_format": "json_schema strict (review_aspects / ASPECT_SCHEMA)",
+    "reasoning_effort": "none (dropped on HTTP 400 fallback)"
+  },
+  "output_schema_version": "aspects-v1 (facet, polarity, evidence; checkpoint keyed by asin+review_no; model label gemma4:12b-it-bf16)",
+  "orchestration": {
+    "repo_commit_on_vm": "9af430dcd117",
+    "machine": "a2-highgpu-1g (1x A100 40GB), SPOT, us-central1-a, MIG emmr-extract-mig, template v7",
+    "started_utc": "2026-07-24T23:23:53Z",
+    "extract_service_starts": 2,
+    "workers_timeline": [
+      {"from_utc": "2026-07-24T23:23:53Z", "workers": 32},
+      {"from_utc": "2026-07-25T00:57:11Z", "workers": 64, "reason": "empty vLLM queue at 88% GPU util; measured 2.26x throughput"}
+    ],
+    "checkpoint": "gs://emmr-9122a143/ckpt/review_aspects.jsonl (5-min sync)",
+    "telemetry": "gs://emmr-9122a143/ckpt/metrics_timeline.jsonl (10-min vLLM token counters; started 2026-07-25T17:45Z, vllm counters cover from 2026-07-25T00:39Z — first ~75min reconstructed via re-tokenization only)"
+  },
+  "notes": "Join these fields into the finalized parquet (finalize_checkpoint) as run-level metadata. Any prompt/model/params change starts a new run_id; outputs are never mixed."
+}

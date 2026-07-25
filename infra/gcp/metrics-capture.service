@@ -1,0 +1,6 @@
+[Unit]
+Description=emmr vLLM token/throughput telemetry snapshot (additive, read-only)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/emmr/repo/infra/gcp/metrics-capture.sh
