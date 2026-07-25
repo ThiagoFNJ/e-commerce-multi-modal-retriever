@@ -33,7 +33,8 @@ spec** (`retriever/schema/products_v1.json`) that the module applies idempotentl
 |---|---|---|---|
 | `text_dense` | 384 | cosine | HNSW, int8 scalar quantization, originals on disk |
 | `review_sent` | 384 × [n] | MAX_SIM multivector | `hnsw_m=0` (Stage-2 only), int8, on-disk |
-| `image` | (SigLIP dim) | cosine | `hnsw_m=0` (Stage-2 only) |
+| `image` | (SigLIP dim) | cosine | `hnsw_m=0` (Stage-2 only); measured: exactly 1 usable hero image/product (355,658 = 79.6%); schema forward-compatible with [n×dim] MAX_SIM if galleries are ever scraped |
+| `aspect_dense` | 384 × [n_facets] | MAX_SIM multivector | `hnsw_m=0` (Stage-2 only); facet phrases from run1 embedded by the shared encoder; polarity in payload |
 | `text_sparse` | — | BM25/idf sparse | Stage-1 |
 | `colbert` *(optional)* | 128 × [n] | MAX_SIM | `hnsw_m=0`, behind a flag |
 
@@ -114,11 +115,12 @@ or encoder drift fails a build, not an experiment.
   filtered by `asin in candidates` with client-side MAX_SIM would be operationally
   simpler at identical quality. **Recommendation: keep on-point for v1** (fewer moving
   parts, decided design), revisit only if ingestion measurements hurt.
-- **[OPEN-2] Aspect artifact hookup.** The full-pass aspects (run1, gi9) are not a
-  channel (§2.1 retired that), but they can enter as **aggregated payload**
-  (`aspects: {facet: {pos: n, neg: n}}`) enabling faceted filtering demos and the
-  §9 extraction-vs-chunking head-to-head. Zero effect on core scoring. Include in v1
-  payload or defer?
+- **[OPEN-2 — RESOLVED 2026-07-25]** Aspects are promoted to a Stage-2 channel:
+  `aspect_dense` MAX_SIM multivector (shared encoder, polarity in payload) + aggregated
+  payload `{facet: {pos, neg}}` for faceted filtering. Grid K becomes 2⁴ = 16 cells and
+  subsumes the §9 head-to-head. The aspects face lands *after* the other faces (full
+  pass still running) via its own `update_vectors` pass — exactly what face-independent
+  ingestion is for.
 - **[OPEN-3] Embedding compute for ~17.6M sentences.** CPU (safe, slow: est. 6-12 h
   M4, needs measurement) vs MPS (fast, burned us once — only with canary + spot-check
   protocol) vs the GCP A100 after the extraction run finishes (BGE-small at GPU batch

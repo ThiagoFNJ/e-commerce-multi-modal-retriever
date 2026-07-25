@@ -45,8 +45,11 @@ cells**. Each cell RRF-fuses the candidate lists of its active channels.
 ### Grid K — reranking (metric: NDCG)
 
 Base ordering = RRF of `{dense, lexical}` (the multi-field text system); optional rerankers
-`{image, review, colbert}` on/off → **2³ = 8 cells**. Each cell RRF-fuses the rankings of
-its active channels over the fixed ≤40.
+`{image, review, aspects, colbert}` on/off → **2⁴ = 16 cells**. Each cell RRF-fuses the
+rankings of its active channels over the fixed ≤40. The `aspects` channel is the run1
+extraction artifact served as an `aspect_dense` multivector (`system-design.md` §2.1
+revival note); the cells (review ✓, aspects ✗) / (✗, ✓) / (✓, ✓) settle the
+extraction-vs-chunking head-to-head — and its redundancy — inside the grid.
 
 - NDCG@10 and NDCG (full list), gains `{E:1.0, S:0.1, C:0.01, I:0.0}`.
 - Report each optional channel's **marginal NDCG** and the pairwise interactions (e.g.
@@ -54,8 +57,8 @@ its active channels over the fixed ≤40.
 - Reference row: **Random** (must reproduce ≈ 0.7483 — see §3).
 
 The baseline ladder (`system-design.md` §8) is the **monotone diagonal** through each grid
-(`000 → 001 → 011 → 111`); the off-diagonal cells expose interaction and redundancy the
-linear ladder cannot show.
+(`000 → 001 → 011 → 111` in Grid R; the 4-bit analogue in Grid K); the off-diagonal cells
+expose interaction and redundancy the linear ladder cannot show.
 
 ---
 

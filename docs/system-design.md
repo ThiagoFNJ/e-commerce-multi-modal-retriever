@@ -123,6 +123,18 @@ subset, where 5.21 s/review is tractable.
 grain control) · RETIRED (LLM aspect extraction — measured infeasible on local hardware:
 5.21 s/review → ~239 days full corpus).**
 
+**Revival note (2026-07-25).** The retirement above was a *cost* verdict, not a quality
+one — and the cost fell: the extraction was re-platformed to a spot A100 (vLLM,
+gemma-4-12B-it BF16, prompt gi9 — held-out facet F1 0.604, `review-aspect-extraction.md`
+§5.8) and the full-corpus pass is running at ~60k reviews/h (~66 GPU-hours total). With
+the artifact paid for, aspects are promoted to a **Stage-2 rerank channel**
+(`aspect_dense`, §3): facet phrases embedded by the shared dense encoder as a `MAX_SIM`
+multivector, polarity kept in payload. Stage-1 is unchanged — topical recall over the
+full corpus remains the full-text channels' job. The §9 extraction-vs-chunking
+head-to-head is subsumed by Grid K's factorial cells (review × aspects,
+`evaluation-plan.md`). The channel inherits the extractor's measured quality; that noise
+is part of what the grid measures.
+
 ---
 
 ## 3. Encoders and channels
@@ -135,6 +147,7 @@ grain control) · RETIRED (LLM aspect extraction — measured infeasible on loca
 | product **lexical** | BM25 sparse | — | Stage-1 exact-term recall |
 | **review** | multivector, row per review sentence (`MAX_SIM`, `hnsw_m=0`) | **same** shared dense encoder | Stage-2 |
 | **image** | single vector | SigLIP (query = text tower → joint space) | Stage-2 |
+| **aspects** | multivector, row per extracted facet (`MAX_SIM`, `hnsw_m=0`); polarity in payload | **same** shared dense encoder over run1 facet phrases (§2.1 revival note) | Stage-2 |
 | product **ColBERT** *(optional)* | token multivector, `hnsw_m=0` | ColBERT | Stage-2 rerank only |
 
 **Rationale.**
@@ -261,7 +274,7 @@ interaction and redundancy. See `docs/evaluation-plan.md`.
 
 - **Review-channel cardinality correction** — measure `corr(n_rows, rank)`; pick none /
   `log(n_rows)` normalization / mean-of-max (§2).
-- **Extraction-vs-chunking head-to-head** on a judged subset — scoped follow-up to the
-  retired aspect-extraction path (§2.1).
+- **Extraction-vs-chunking head-to-head** — subsumed by Grid K's review × aspects
+  factorial cells since the §2.1 revival note (aspects are now a Stage-2 channel).
 - **Dense encoder selection** (§3).
 - **Learned fusion** as a scoped research extension (§5), not the core.
