@@ -1,0 +1,12 @@
+# Qdrant server config — versioned; behavior changes go through review, not env drift.
+telemetry_disabled: true
+
+storage:
+  # payloads on disk: the corpus payload (aspects aggregates, catalog fields) is
+  # read-mostly and larger than hot RAM should pay for
+  on_disk_payload: true
+  snapshots_path: /qdrant/snapshots
+
+service:
+  http_port: 6333
+  grpc_port: 6334

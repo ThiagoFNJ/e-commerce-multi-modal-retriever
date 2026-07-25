@@ -30,3 +30,5 @@ docs/review-mining-research.md
 
 # --- Third-party papers (not redistributed) ---
 refs/
+infra/qdrant/snapshots/*
+!infra/qdrant/snapshots/.gitkeep

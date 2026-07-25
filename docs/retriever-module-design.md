@@ -26,8 +26,9 @@ scope — 447k points is a single-node problem.
 
 ## 2. Collection lifecycle — schema-as-code + version gate
 
-**Decision (proposed).** One collection, `products`, defined by a **versioned schema
-spec** (`retriever/schema/products_v1.json`) that the module applies idempotently:
+**Decision (implemented).** One collection, `products`, defined by a **versioned schema
+spec** (`src/emmr/retriever/specs/products_v1.json`) that the module applies idempotently
+(`emmr.retriever.schema`, CLI `scripts/retriever_ctl.py`, Makefile targets):
 
 | named vector | dim | distance | config |
 |---|---|---|---|
