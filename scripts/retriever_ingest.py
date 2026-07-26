@@ -24,7 +24,7 @@ def main() -> None:
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    client = QdrantClient(url="http://localhost:6333", timeout=120)
+    client = QdrantClient(url="http://localhost:6333", prefer_grpc=True, timeout=120)
     if args.face == "f1":
         stats = ingest_f1(client, limit=args.limit, batch=args.batch, device=args.device)
     else:

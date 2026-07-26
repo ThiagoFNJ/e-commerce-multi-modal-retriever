@@ -67,7 +67,9 @@ def ingest_f2(client: QdrantClient, *, limit: int = 0, flush_products: int = 64,
                 vector={"review_sent": [v.tolist() for v in vecs[i:i + len(rows)]]},
             ))
             i += len(rows)
-        client.update_vectors(collection, points=ops, wait=True)
+        # wait=False: server acks async; the post-run gate (points with review_sent vs
+        # checkpoint) catches any lost write, so at-least-once still holds
+        client.update_vectors(collection, points=ops, wait=False)
         with open(ckpt, "a") as f:
             f.write("\n".join(a for a, _ in pending) + "\n")
         pending.clear()
