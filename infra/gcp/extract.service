@@ -9,7 +9,7 @@ WorkingDirectory=/opt/emmr/repo
 ExecStartPre=/bin/bash -c 'until curl -sf http://localhost:8000/health; do sleep 5; done'
 ExecStart=/opt/emmr/venv/bin/python scripts/05_extract_review_aspects.py \
   --input /opt/emmr/data/reviews_slim.parquet \
-  --workers 32 \
+  --workers 64 \
   --model gemma4:12b-it-bf16
 Environment=EMMR_EXTRACTION_BACKEND=openai
 Environment=EMMR_EXTRACTION_ENDPOINT=http://localhost:8000/v1
