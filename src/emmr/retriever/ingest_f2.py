@@ -50,6 +50,10 @@ def ingest_f2(client: QdrantClient, *, limit: int = 0, flush_products: int = 64,
     done = set(ckpt.read_text().split()) if ckpt.exists() else set()
     logging.info("F2: %d products already done", len(done))
 
+    # bulk-load mode: optimizer merges during scattered update_vectors were measured at
+    # 205% server CPU for ~80 rows/s; paused -> 2.75x. Restored (one final merge) at the end.
+    client.update_collection(collection, optimizer_config=models.OptimizersConfigDiff(
+        indexing_threshold=0, max_optimization_threads=0))
     encoder = TextEncoder(spec, device=device)
     stats = {"products": 0, "products_no_rows": 0, "rows": 0, "skipped_done": len(done)}
     pending: list[tuple[str, list[str]]] = []
@@ -93,4 +97,6 @@ def ingest_f2(client: QdrantClient, *, limit: int = 0, flush_products: int = 64,
             if stats["products"] % 12800 < flush_products:
                 logging.info("F2: %d products, %d rows", stats["products"], stats["rows"])
     flush()
+    client.update_collection(collection, optimizer_config=models.OptimizersConfigDiff(
+        indexing_threshold=20_000, max_optimization_threads=None))
     return stats

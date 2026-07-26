@@ -24,7 +24,11 @@ def split_sentences(text: str) -> list[str]:
 
 
 def is_english(sentence: str) -> bool:
+    import logging as _logging
+
     from fast_langdetect import detect
+
+    _logging.getLogger("fast_langdetect").setLevel(_logging.WARNING)  # 1 INFO line per long sentence x 17M rows
 
     try:
         result = detect(sentence)  # fasttext lid.176: [{"lang": "en", "score": ...}]
