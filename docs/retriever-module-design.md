@@ -105,6 +105,17 @@ real cost driver [OPEN-3].
 fixture** (committed parquet slice + frozen expected metrics with tolerance) so schema
 or encoder drift fails a build, not an experiment.
 
+## Operational note — long local jobs run detached (2026-07-26)
+
+During F1 ingestion, three session-managed background runs were killed by an external
+SIGTERM to their process group (35 min / 30 min / 68 min in; ruled out: OOM (no jetsam),
+sleep (no pmset events), crash (clean logs up to the signal)). The run only completed
+when the worker was launched in its **own session** (`start_new_session=True`, orphaned
+to launchd) with a disposable watcher polling its checkpoint. Pattern adopted for every
+multi-hour local job: **detached worker + checkpoint + disposable watcher** — the worker
+must never depend on the interactive session's lifecycle. (Cloud jobs already follow
+this via systemd.)
+
 ## Open decision points
 
 - **[OPEN-1] Review sentences: multivector-on-point (as decided in system-design §1/§2)
