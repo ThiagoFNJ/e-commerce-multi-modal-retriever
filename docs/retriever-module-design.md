@@ -116,6 +116,21 @@ multi-hour local job: **detached worker + checkpoint + disposable watcher** — 
 must never depend on the interactive session's lifecycle. (Cloud jobs already follow
 this via systemd.)
 
+## Face status (2026-07-27)
+
+| Face | State | Detail |
+|---|---|---|
+| F1 catalog (text_dense + text_sparse) | **done** | 447,924 points; hybrid RRF validated |
+| F2 review_sent (MAX_SIM multivector) | **done** | 412,739 review-bearing products processed; 410,669 got vectors, 2,070 zero-row products correctly vector-less (absence ≠ zero, §2/§7); ~12.24M sentence rows; MPS-embedded (canaried), gRPC + async + optimizer-pause bulk mode |
+| F3 aspect_dense | pending | awaits run1 finalize (~4h) |
+| F4 image (SigLIP) | pending | 355k hero images |
+
+Two F2 gotchas recorded: (1) the completion target is **review-bearing** products
+(412,739), not the catalog (447,924) — not every product has reviews; (2) a hot-swap
+that killed only the `uv run` wrapper left an orphaned child, so two workers ran
+concurrently for ~20k products (idempotent, no corruption, but wasteful) — kill by
+process-group / `pkill -f`, verify worker count after every swap.
+
 ## Open decision points
 
 - **[OPEN-1] Review sentences: multivector-on-point (as decided in system-design §1/§2)
