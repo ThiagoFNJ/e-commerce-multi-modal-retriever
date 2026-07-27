@@ -221,8 +221,11 @@ and review length, a flattened slice localizes where extraction degrades — bey
 of a 600-review gold set. Diagnostic only: optimizing against this weak proxy would teach
 the model to echo overall review tone instead of per-facet sentiment.
 
-**Status: DECIDED (harness partially implemented: sampling + metrics in `goldset.py`;
-proportional test-split mode and the star-consistency function pending).**
+**Status: DECIDED · IMPLEMENTED** (`scripts/star_crosscheck.py`: mean facet polarity per
+review joined to `rev_stars` via reconstructed `review_no`, per-star curve + Spearman +
+monotonicity, sliced by country and length tercile). Dry-run on a 2k-review checkpoint
+sample: monotone 1★ −0.500 → 5★ +0.659, Spearman 0.51, monotone in every slice — runs on
+the full artifact at finalize.
 
 ---
 
