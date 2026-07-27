@@ -19,6 +19,7 @@ dependencies = [
     "qdrant-client>=1.15,<1.16",
     "fastembed>=0.8.0",
     "fast-langdetect>=1.0.1",
+    "sentencepiece>=0.2.2",
 ]
 
 [project.optional-dependencies]

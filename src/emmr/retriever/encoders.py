@@ -65,3 +65,54 @@ class TextEncoder:
             texts, batch_size=batch_size,
             normalize_embeddings=True, show_progress_bar=False,
         )
+
+
+# --- canary image: deterministic 224x224 gradient, no file dependency ---
+def _canary_image():
+    from PIL import Image
+    import numpy as _np
+    g = _np.zeros((224, 224, 3), dtype=_np.uint8)
+    g[:, :, 0] = _np.linspace(0, 255, 224, dtype=_np.uint8)[None, :]
+    g[:, :, 1] = _np.linspace(0, 255, 224, dtype=_np.uint8)[:, None]
+    return Image.fromarray(g, "RGB")
+
+
+class ImageEncoder:
+    """SigLIP dual-tower: image tower for products, text tower for queries (joint space)."""
+
+    def __init__(self, spec: dict | None = None, device: str = "cpu"):
+        import torch
+        from transformers import AutoProcessor, SiglipModel
+
+        cfg = (spec or schema.load_spec())["encoders"]["image"]
+        self.model_id, self.revision, self.dim = cfg["model"], cfg["revision"], cfg["dim"]
+        self.device = device
+        self._torch = torch
+        self._m = SiglipModel.from_pretrained(self.model_id, revision=self.revision).eval().to(device)
+        self._p = AutoProcessor.from_pretrained(self.model_id, revision=self.revision)
+        self._canary()
+
+    def _norm(self, t):
+        return self._torch.nn.functional.normalize(t, p=2, dim=-1).cpu().numpy()
+
+    def encode_images(self, images: list, batch_size: int = 64):
+        out = []
+        for i in range(0, len(images), batch_size):
+            px = self._p(images=images[i:i + batch_size], return_tensors="pt")["pixel_values"].to(self.device)
+            with self._torch.no_grad():
+                feat = self._m.get_image_features(pixel_values=px).pooler_output
+            out.append(self._norm(feat))
+        import numpy as _np
+        return _np.concatenate(out) if out else _np.empty((0, self.dim))
+
+    def encode_queries(self, texts: list[str]):
+        ids = self._p(text=texts, return_tensors="pt", padding="max_length").input_ids.to(self.device)
+        with self._torch.no_grad():
+            feat = self._m.get_text_features(input_ids=ids).pooler_output
+        return self._norm(feat)
+
+    def _canary(self) -> None:
+        a = self.encode_images([_canary_image()])[0]
+        b = self.encode_images([_canary_image()])[0]
+        if float(np.dot(a, b)) < 0.999:
+            raise RuntimeError(f"image encoder canary failed: identity cosine {np.dot(a, b):.4f} on {self.device}")

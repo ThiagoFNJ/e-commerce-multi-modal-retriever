@@ -13,11 +13,12 @@ from qdrant_client import QdrantClient
 
 from emmr.retriever.ingest import ingest_f1
 from emmr.retriever.ingest_f2 import ingest_f2
+from emmr.retriever.ingest_f4 import ingest_f4
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("face", choices=["f1", "f2"])
+    ap.add_argument("face", choices=["f1", "f2", "f4"])
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--device", default="cpu")
@@ -27,8 +28,10 @@ def main() -> None:
     client = QdrantClient(url="http://localhost:6333", prefer_grpc=True, timeout=120)
     if args.face == "f1":
         stats = ingest_f1(client, limit=args.limit, batch=args.batch, device=args.device)
-    else:
+    elif args.face == "f2":
         stats = ingest_f2(client, limit=args.limit, device=args.device)
+    else:
+        stats = ingest_f4(client, limit=args.limit, batch=args.batch or 128, device=args.device)
     print(stats)
 
 
