@@ -123,7 +123,14 @@ this via systemd.)
 | F1 catalog (text_dense + text_sparse) | **done** | 447,924 points; hybrid RRF validated |
 | F2 review_sent (MAX_SIM multivector) | **done** | 412,739 review-bearing products processed; 410,669 got vectors, 2,070 zero-row products correctly vector-less (absence ≠ zero, §2/§7); ~12.24M sentence rows; MPS-embedded (canaried), gRPC + async + optimizer-pause bulk mode |
 | F4 image (SigLIP) | **done** | 355,658 points (100% of usable), 0 unreadable; cross-modal text→image validated (sneakers→apparel, clock→home, bottle→sports) |
-| F3 aspect_dense | pending | awaits run1 finalize (imminent, 99.7%) |
+| F3 aspect_dense (+ payload) | **done** | 408,099 products; 71,164 distinct facets embedded once (shared BGE, cached); MAX_SIM channel + `{facet:{pos,neg,neu}}` payload; polarity-neutral vector |
+
+**All four faces ingested (2026-07-27).** Per-channel coverage = per-channel input
+population, absence graceful: text_dense/text_sparse 447,924 (catalog), review_sent
+410,669, image 355,658, aspect_dense 408,099. End-to-end two-stage retrieval validated:
+Stage-1 (dense+sparse RRF over corpus) → 40 candidates → Stage-2 (review+image+aspect
+RRF over candidates); "waterproof hiking boots with good ankle support" → KEEN/XPETI/
+Mishansha boots. Index ready for the evaluation grids (Grid R 2³, Grid K 2⁴).
 
 Two F2 gotchas recorded: (1) the completion target is **review-bearing** products
 (412,739), not the catalog (447,924) — not every product has reviews; (2) a hot-swap
