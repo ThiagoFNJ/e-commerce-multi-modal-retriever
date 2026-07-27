@@ -122,8 +122,8 @@ this via systemd.)
 |---|---|---|
 | F1 catalog (text_dense + text_sparse) | **done** | 447,924 points; hybrid RRF validated |
 | F2 review_sent (MAX_SIM multivector) | **done** | 412,739 review-bearing products processed; 410,669 got vectors, 2,070 zero-row products correctly vector-less (absence ≠ zero, §2/§7); ~12.24M sentence rows; MPS-embedded (canaried), gRPC + async + optimizer-pause bulk mode |
-| F3 aspect_dense | pending | awaits run1 finalize (~4h) |
-| F4 image (SigLIP) | pending | 355k hero images |
+| F4 image (SigLIP) | **done** | 355,658 points (100% of usable), 0 unreadable; cross-modal text→image validated (sneakers→apparel, clock→home, bottle→sports) |
+| F3 aspect_dense | pending | awaits run1 finalize (imminent, 99.7%) |
 
 Two F2 gotchas recorded: (1) the completion target is **review-bearing** products
 (412,739), not the catalog (447,924) — not every product has reviews; (2) a hot-swap
