@@ -1,0 +1,120 @@
+aspect-bearing reviews joined to stars: 3,294,069
+
+[ALL] n=3,294,069 spearman=0.4819 monotone=True
+  1★  mean_pol=-0.4437  n=148,178
+  2★  mean_pol=-0.3373  n=101,131
+  3★  mean_pol=-0.1995  n=285,589
+  4★  mean_pol=+0.1803  n=820,195
+  5★  mean_pol=+0.6505  n=1,938,976
+
+[country=Australia] n=17,940 spearman=0.4343 monotone=True
+  1★  mean_pol=-0.4938  n=2,353
+  2★  mean_pol=-0.2920  n=1,013
+  3★  mean_pol=-0.1445  n=1,635
+  4★  mean_pol=+0.2059  n=3,242
+  5★  mean_pol=+0.5231  n=9,697
+
+[country=Canada] n=360,283 spearman=0.3838 monotone=True
+  1★  mean_pol=-0.3606  n=47,054
+  2★  mean_pol=-0.2441  n=22,725
+  3★  mean_pol=-0.1007  n=35,680
+  4★  mean_pol=+0.1789  n=65,637
+  5★  mean_pol=+0.4646  n=189,187
+
+[country=España] n=19,252 spearman=0.4305 monotone=True
+  1★  mean_pol=-0.5740  n=426
+  2★  mean_pol=-0.3879  n=375
+  3★  mean_pol=-0.1554  n=1,397
+  4★  mean_pol=+0.3622  n=5,660
+  5★  mean_pol=+0.7048  n=11,394
+
+[country=Germany] n=19,535 spearman=0.4108 monotone=True
+  1★  mean_pol=-0.3375  n=2,520
+  2★  mean_pol=-0.2301  n=1,162
+  3★  mean_pol=-0.0418  n=1,708
+  4★  mean_pol=+0.2482  n=3,154
+  5★  mean_pol=+0.5138  n=10,991
+
+[country=India] n=11,195 spearman=0.4174 monotone=True
+  1★  mean_pol=-0.5413  n=2,374
+  2★  mean_pol=-0.4354  n=642
+  3★  mean_pol=-0.2182  n=908
+  4★  mean_pol=+0.1720  n=1,846
+  5★  mean_pol=+0.3571  n=5,425
+
+[country=Italy] n=9,889 spearman=0.3791 monotone=True
+  1★  mean_pol=-0.1365  n=1,145
+  2★  mean_pol=-0.1032  n=481
+  3★  mean_pol=+0.0647  n=790
+  4★  mean_pol=+0.3789  n=1,654
+  5★  mean_pol=+0.6216  n=5,819
+
+[country=Japa] n=7,331 spearman=0.3684 monotone=True
+  1★  mean_pol=-0.3786  n=390
+  2★  mean_pol=-0.3554  n=255
+  3★  mean_pol=-0.0771  n=722
+  4★  mean_pol=+0.3080  n=2,532
+  5★  mean_pol=+0.5520  n=3,432
+
+[country=Japan] n=7,184 spearman=0.3718 monotone=True
+  1★  mean_pol=-0.4008  n=417
+  2★  mean_pol=-0.3861  n=238
+  3★  mean_pol=-0.1710  n=730
+  4★  mean_pol=+0.3224  n=2,504
+  5★  mean_pol=+0.5325  n=3,295
+
+[country=Mexico] n=96,993 spearman=0.3533 monotone=True
+  1★  mean_pol=-0.1647  n=9,131
+  2★  mean_pol=-0.1027  n=4,648
+  3★  mean_pol=+0.0265  n=8,618
+  4★  mean_pol=+0.2633  n=17,104
+  5★  mean_pol=+0.5716  n=57,492
+
+[country=Reino Unido] n=5,819 spearman=0.3791 monotone=True
+  1★  mean_pol=-0.2627  n=845
+  2★  mean_pol=-0.1578  n=334
+  3★  mean_pol=-0.0192  n=502
+  4★  mean_pol=+0.2480  n=881
+  5★  mean_pol=+0.5135  n=3,257
+
+[country=el Reino Unido] n=5,611 spearman=0.3872 monotone=True
+  1★  mean_pol=-0.2685  n=793
+  2★  mean_pol=-0.1405  n=319
+  3★  mean_pol=+0.0009  n=461
+  4★  mean_pol=+0.2249  n=795
+  5★  mean_pol=+0.5319  n=3,243
+
+[country=the United Kingdom] n=275,187 spearman=0.4357 monotone=True
+  1★  mean_pol=-0.3627  n=29,720
+  2★  mean_pol=-0.2756  n=14,914
+  3★  mean_pol=-0.0576  n=24,816
+  4★  mean_pol=+0.2966  n=45,296
+  5★  mean_pol=+0.5939  n=160,441
+
+[country=the United States] n=2,434,073 spearman=0.5130 monotone=True
+  1★  mean_pol=-0.6471  n=47,743
+  2★  mean_pol=-0.4247  n=52,800
+  3★  mean_pol=-0.2491  n=205,654
+  4★  mean_pol=+0.1663  n=665,943
+  5★  mean_pol=+0.6887  n=1,461,933
+
+[length=short] n=1,099,545 spearman=0.5022 monotone=True
+  1★  mean_pol=-0.4748  n=47,289
+  2★  mean_pol=-0.3713  n=29,596
+  3★  mean_pol=-0.2590  n=86,242
+  4★  mean_pol=+0.2184  n=241,472
+  5★  mean_pol=+0.7526  n=694,946
+
+[length=medium] n=1,097,288 spearman=0.4847 monotone=True
+  1★  mean_pol=-0.4762  n=53,027
+  2★  mean_pol=-0.3471  n=35,754
+  3★  mean_pol=-0.2118  n=99,574
+  4★  mean_pol=+0.1453  n=275,870
+  5★  mean_pol=+0.6251  n=633,063
+
+[length=long] n=1,097,236 spearman=0.4570 monotone=True
+  1★  mean_pol=-0.3771  n=47,862
+  2★  mean_pol=-0.2995  n=35,781
+  3★  mean_pol=-0.1357  n=99,773
+  4★  mean_pol=+0.1818  n=302,853
+  5★  mean_pol=+0.5608  n=610,967

@@ -520,6 +520,31 @@ held-out scores with CIs, star-consistency results by slice, and known limitatio
 
 ---
 
+### 5.9 Full pass complete (run1, 2026-07-27)
+
+The 3.95M-review corpus pass finished on the spot A100 with prompt gi9 (gemma-4-12B-it
+BF16, vLLM, guided JSON, temperature 0).
+
+| | |
+|---|---|
+| reviews covered | **3,950,828 / 3,952,486 (99.96%)** |
+| failures | 1,658 (0.04%) — over-length reviews exceeding the 4096-token context (HTTP 400); recorded, not chased |
+| aspect rows | 9,507,120 |
+| aspects extracted | 8,850,361 (2.69 per aspect-bearing review) |
+| zero-aspect reviews | 656,759 (16.6%) — examined, no product-intrinsic facet (kept as null-facet rows) |
+| top facets | build quality, appearance, sizing accuracy, durability, comfort, fit — the gi9-calibrated vocabulary, at corpus scale |
+
+**§4.3 star cross-check — PASS.** Over 3,294,069 aspect-bearing reviews: mean facet
+polarity is **monotone** in stars (1★ −0.444 → 5★ +0.650), Spearman 0.482, and monotone in
+**every** country and length slice (full report: `reports/star_crosscheck_run1.txt`). No
+negation inversion, no flattening — corpus-scale polarity is sound. Diagnostic only (§4.3).
+
+Shutdown sequence executed: final checkpoint sync to GCS → finalize → parquet → §4.3 gate
+→ teardown (go-flag removed, MIG scaled to 0, templates/snapshots kept). Artifact was
+persisted and validated before any teardown.
+
+---
+
 ## 8. Status summary
 
 | item | status |
@@ -529,8 +554,9 @@ held-out scores with CIs, star-consistency results by slice, and known limitatio
 | Resilience (JSONL checkpoint, cache, retry semantics) | DECIDED, implemented |
 | Gold set (600; dev 248 / test 350 frozen) | **DONE** — labeled, arbitrated, frozen 2026-07-21; proportional sampler mode pending |
 | Metrics (semantic-match P/R/F1, matched-only polarity, bootstrap) | DECIDED, implemented — baseline v2 scored on dev (`eval_gold.py`) |
-| Star cross-check | DECIDED — function pending |
+| Star cross-check | **DONE** — implemented (`scripts/star_crosscheck.py`); run1 PASS, monotone all slices (§5.9) |
 | Optimization harness (§5) | implemented — round 1 (§5.4), model bracket (§5.5), honest rerun (§5.6) |
 | Extractor + prompt selection | **DONE** — gemma4:12b + gm10 (§5.6) |
 | Held-out test score (§5.3 finalize) | **DONE** — semantic F1 0.5838 [0.546, 0.622], polarity 0.959 (§5.7); test sealed |
-| v1 scope (full vs first-k) | OPEN — decided by pilot throughput |
+| v1 scope (full vs first-k) | **DONE** — full 3.95M pass (§5.9), 99.96% coverage |
+| Full-corpus artifact (`review_aspects.parquet`) | **DONE** — 9.5M aspect rows, §4.3 validated, finalized 2026-07-27 |
